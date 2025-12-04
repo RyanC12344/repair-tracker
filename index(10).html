@@ -1,0 +1,1926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jump Starter Repair Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .job-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 3px solid #667eea;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .job-info-item {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .job-info-label {
+            color: #666;
+            font-size: 14px;
+            font-weight: normal;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .form-section {
+            padding: 30px;
+        }
+
+        .section-page {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .section-page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2a5298;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .progress-bar {
+            background: #e0e0e0;
+            height: 8px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 16px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s;
+            user-select: none;
+        }
+
+        .checkbox-item:hover {
+            background: #e9ecef;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 24px;
+            height: 24px;
+            margin-right: 10px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .checkbox-item.checked {
+            background: #e7f3ff;
+            border-color: #667eea;
+        }
+
+        .checkbox-item label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: normal;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .radio-item {
+            display: flex;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+            justify-content: center;
+        }
+
+        .radio-item:hover {
+            background: #e9ecef;
+        }
+
+        .radio-item input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .radio-item.checked {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+
+        .radio-item.checked.fail {
+            background: #f8d7da;
+            border-color: #dc3545;
+        }
+
+        .serial-number-group {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .serial-prefix {
+            flex: 0 0 120px;
+        }
+
+        .serial-number {
+            flex: 1;
+        }
+
+        .number-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+            max-width: 300px;
+        }
+
+        .number-pad button {
+            padding: 20px;
+            font-size: 24px;
+            font-weight: 600;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .number-pad button:hover {
+            background: #f8f9fa;
+            border-color: #667eea;
+        }
+
+        .number-pad button:active {
+            transform: scale(0.95);
+        }
+
+        .number-pad button.clear {
+            background: #dc3545;
+            color: white;
+            border-color: #dc3545;
+        }
+
+        .number-pad button.clear:hover {
+            background: #c82333;
+        }
+
+        .battery-date-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .date-suggestion {
+            padding: 8px 16px;
+            background: #e7f3ff;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .date-suggestion:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .navigation-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 18px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-previous {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-previous:hover {
+            box-shadow: 0 10px 30px rgba(108, 117, 125, 0.4);
+        }
+
+        .btn-next {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-next:hover {
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+        }
+
+        .btn-submit:hover {
+            box-shadow: 0 10px 30px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .job-selector {
+            padding: 30px;
+            text-align: center;
+        }
+
+        .job-list {
+            display: grid;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .job-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+        }
+
+        .job-card:hover {
+            border-color: #667eea;
+            background: #e7f3ff;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .job-card-number {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2a5298;
+            margin-bottom: 5px;
+        }
+
+        .job-card-customer {
+            font-size: 16px;
+            color: #666;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 2px solid #c3e6cb;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 2px solid #f5c6cb;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #666;
+        }
+
+        .back-button {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .back-button:hover {
+            background: #5a6268;
+        }
+
+        .job-tab.active {
+            border-bottom-color: #667eea !important;
+            color: #667eea !important;
+        }
+
+        .job-tab:hover {
+            background: #f8f9fa;
+        }
+
+        .expected-today {
+            border: 3px solid #28a745 !important;
+            background: #d4edda !important;
+        }
+
+        .expected-tomorrow {
+            border: 3px solid #ffc107 !important;
+            background: #fff3cd !important;
+        }
+
+        .expected-soon {
+            border: 3px solid #17a2b8 !important;
+            background: #d1ecf1 !important;
+        }
+
+        .repair-today {
+            border: 3px solid #28a745 !important;
+            background: #d4edda !important;
+        }
+
+        .repair-completed {
+            opacity: 0.7;
+            background: #f8f9fa !important;
+        }
+
+        .repair-completed .job-card-number {
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔋 Jump Starter Repair Tracker</h1>
+            <p>Professional Repair Documentation System</p>
+        </div>
+
+        <!-- Job Selection Screen -->
+        <div id="jobSelector" class="job-selector">
+            <h2 class="section-title">Select a Job to Begin Repair</h2>
+            <div style="text-align: center; color: #667eea; font-weight: 600; margin-bottom: 15px; font-size: 16px;" id="currentMonthDisplay"></div>
+            
+            <!-- Tabs for Current vs Expected vs Completed -->
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e0e0e0;">
+                <button id="tabCurrent" class="job-tab active" onclick="showJobTab('current')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid #667eea; color: #667eea;">
+                    Current Repairs (<span id="currentCount">0</span>)
+                </button>
+                <button id="tabExpected" class="job-tab" onclick="showJobTab('expected')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; color: #999;">
+                    Expected Arrivals (<span id="expectedCount">0</span>)
+                </button>
+                <button id="tabCompleted" class="job-tab" onclick="showJobTab('completed')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; color: #999;">
+                    Completed (<span id="completedCount">0</span>)
+                </button>
+            </div>
+            
+            <div style="margin-bottom: 25px;">
+                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                    <div style="flex: 1;">
+                        <label for="dateFilter" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Filter by Date:</label>
+                        <input type="date" id="dateFilter" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px;" onchange="filterJobs()">
+                    </div>
+                    <div style="flex: 1;">
+                        <label for="searchJob" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Search Job Number:</label>
+                        <input type="text" id="searchJob" placeholder="e.g., R1101" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px;" oninput="filterJobs()">
+                    </div>
+                </div>
+                <button onclick="showAllJobs()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Show All Active Jobs</button>
+                <button onclick="showTodayJobs()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; margin-left: 10px;">Today's Jobs</button>
+            </div>
+            
+            <div class="loading" id="loadingJobs">Loading jobs...</div>
+            <div id="jobCount" style="text-align: center; color: #666; margin-bottom: 15px; font-weight: 600;"></div>
+            <div class="job-list" id="jobList"></div>
+        </div>
+
+        <!-- Repair Form Screen -->
+        <div id="repairForm" class="hidden">
+            <!-- Sticky Job Info Header -->
+            <div class="job-info">
+                <div class="job-info-item">
+                    <span class="job-info-label">Job Number</span>
+                    <span id="currentJobNumber">-</span>
+                </div>
+                <div class="job-info-item">
+                    <span class="job-info-label">Customer</span>
+                    <span id="currentCustomerName">-</span>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <button class="back-button" onclick="backToJobSelector()">← Back to Job List</button>
+                
+                <div id="successMessage" class="success-message hidden">
+                    ✓ Repair record saved successfully!
+                </div>
+                
+                <div id="errorMessage" class="error-message hidden"></div>
+
+                <div class="progress-text">
+                    <span id="progressText">Step 1 of 10</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 10%"></div>
+                </div>
+
+                <form id="mainForm">
+                    <!-- Page 1: Items Received -->
+                    <div class="section-page active" data-page="1">
+                        <div class="section-title">Items Received</div>
+                        <div class="form-group">
+                            <label>What items were received?</label>
+                            <div class="checkbox-group">
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="receivedPack" checked disabled>
+                                    <label for="receivedPack">Pack (always received)</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('receivedLeads')">
+                                    <input type="checkbox" id="receivedLeads">
+                                    <label for="receivedLeads">Leads</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('receivedCharger')">
+                                    <input type="checkbox" id="receivedCharger">
+                                    <label for="receivedCharger">Charger</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="conditionNotes">Condition Notes</label>
+                            <textarea id="conditionNotes" placeholder="e.g., case cracked, lugs broken, dirty, etc."></textarea>
+                        </div>
+
+                        <div class="navigation-buttons">
+                            <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
+                        </div>
+                    </div>
+
+                    <!-- Page 2: Charger & Leads Testing (conditional) -->
+                    <div class="section-page" data-page="2">
+                        <div class="section-title">Charger & Leads Testing</div>
+                        
+                        <div id="chargerSection">
+                            <h3 style="color: #667eea; margin-bottom: 15px;">Charger Testing</h3>
+                            
+                            <div class="form-group">
+                                <label for="chargerType">Charger Type</label>
+                                <select id="chargerType" onchange="checkChargerType()">
+                                    <option value="">Select charger type</option>
+                                    <option value="5a">5 Amp</option>
+                                    <option value="2a">2 Amp</option>
+                                    <option value="1.5a">1.5 Amp (Upgrade to 2A)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="chargerFloat">Float Voltage</label>
+                                <input type="text" id="chargerFloat" placeholder="Enter float voltage">
+                            </div>
+                            <div class="form-group">
+                                <label for="chargerBulk">Bulk Voltage</label>
+                                <input type="text" id="chargerBulk" placeholder="Enter bulk voltage">
+                            </div>
+                            <div class="form-group">
+                                <label for="chargerMaxCurrent">Max Current</label>
+                                <input type="text" id="chargerMaxCurrent" placeholder="Enter max current">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Charger Test Result</label>
+                                <div class="radio-group">
+                                    <div class="radio-item" onclick="selectRadio('chargerTest', 'pass')">
+                                        <input type="radio" name="chargerTest" id="chargerTestPass" value="Pass">
+                                        <span style="cursor: pointer;">✓ Pass</span>
+                                    </div>
+                                    <div class="radio-item fail" onclick="selectRadio('chargerTest', 'fail')">
+                                        <input type="radio" name="chargerTest" id="chargerTestFail" value="Fail">
+                                        <span style="cursor: pointer;">✗ Fail</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="leadsSection" style="margin-top: 30px;">
+                            <h3 style="color: #667eea; margin-bottom: 15px;">Leads/Clamps Condition</h3>
+                            <div class="form-group">
+                                <label>Clamps Test Result</label>
+                                <div class="radio-group">
+                                    <div class="radio-item" onclick="selectRadio('clampsTest', 'pass')">
+                                        <input type="radio" name="clampsTest" id="clampsTestPass" value="Pass">
+                                        <span style="cursor: pointer;">✓ Pass</span>
+                                    </div>
+                                    <div class="radio-item fail" onclick="selectRadio('clampsTest', 'fail')">
+                                        <input type="radio" name="clampsTest" id="clampsTestFail" value="Fail">
+                                        <span style="cursor: pointer;">✗ Fail</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="navigation-buttons">
+                            <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
+                            <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
+                        </div>
+                    </div>
+
+                    <!-- Page 3: Panel & Lights -->
+                    <div class="section-page" data-page="3">
+                        <div class="section-title">Panel & Lights Inspection</div>
+                        <div class="form-group">
+                            <label>Panel Sockets</label>
+                            <div class="radio-group">
+                                <div class="radio-item" onclick="selectRadio('panelSockets', 'pass')">
+                                    <input type="radio" name="panelSockets" id="panelSocketsPass" value="Pass">
+                                    <label for="panelSocketsPass">✓ Pass</label>
+                                </div>
+                                <div class="radio-item fail" onclick="selectRadio('panelSockets', 'fail')">
+                                    <input type="radio" name="panelSockets" id="panelSocketsFail" value="Fail">
+                                    <label for="panelSocketsFail">✗ Fail</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Lights State</label>
+                            <div class="radio-group">
+                                <div class="radio-item" onclick="selectRadio('lightsState', 'pass')">
+                                    <input type="radio" name="lightsState" id="lightsStatePass" value="Pass">
+                                    <label for="lightsStatePass">✓ Pass</label>
+                                </div>
+                                <div class="radio-item fail" onclick="selectRadio('lightsState', 'fail')">
+                                    <input type="radio" name="lightsState" id="lightsStateFail" value="Fail">
+                                    <label for="lightsStateFail">✗ Fail</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="navigation-buttons">
+                            <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
+                            <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
+                        </div>
+                    </div>
+
+                    <!-- Page 4: Battery Info -->
+                    <div class="section-page" data-page="4">
+                        <div class="section-title">Battery Information</div>
+                        <div class="form-group">
+                            <label for="batteryMake">Battery Make</label>
+                            <select id="batteryMake">
+                                <option value="BB24" selected>BB24</option>
+                                <option value="BB22">BB22</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="batteryDate">Date of Manufacture</label>
+                            <input type="text" id="batteryDate" placeholder="e.g., CH240519" maxlength="8">
+                            <div class="battery-date-suggestions" id="dateSuggestions"></div>
+                        </div>
+
+                        <div class="navigation-buttons">
+                            <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
+                            <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
+                        </div>
+                    </div>
+
+                    <!-- Page 5: Serial Number & P.O.P -->
+                    <div class="section-page" data-page="5">
+                        <div class="section-title">Serial Number & P.O.P Date</div>
+                        <div class="form-group">
+                            <label>Serial Number</label>
+                            <div class="serial-number-group">
+                                <div class="serial-prefix">
+                                    <select id="serialPrefix">
+                                        <option value="NA">NA</option>
+                                        <option value="DZ1H">DZ1H</option>
+                                    </select>
+                                </div>
+                                <div class="serial-number">
+                                    <input type="text" id="serialNumbers" placeholder="Enter 5 digits" maxlength="5" readonly>
+                                </div>
+                            </div>
+                            <div class="number-pad">
+                                <button type="button" onclick="addNumber('1')">1</button>
+                                <button type="button" onclick="addNumber('2')">2</button>
+                                <button type="button" onclick="addNumber('3')">3</button>
+                                <button type="button" onclick="addNumber('4')">4</button>
+                                <button type="button" onclick="addNumber('5')">5</button>
+                                <button type="button" onclick="addNumber('6')">6</button>
+                                <button type="button" onclick="addNumber('7')">7</button>
+                                <button type="button" onclick="addNumber('8')">8</button>
+                                <button type="button" onclick="addNumber('9')">9</button>
+                                <button type="button" class="clear" onclick="clearNumbers()">Clear</button>
+                                <button type="button" onclick="addNumber('0')">0</button>
+                                <button type="button" onclick="backspaceNumber()">⌫</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 30px;">
+                            <label for="popDate">P.O.P Date (Date Pack Originally Sold)</label>
+                            <input type="text" id="popDate" placeholder="e.g., 15/06/2024">
+                            <p style="margin-top: 8px; color: #666; font-size: 14px;">Use your lookup table to find the original sale date based on the serial number.</p>
+                        </div>
+
+                        <div class="navigation-buttons">
+                            <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
+                            <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
+                        </div>
+                    </div>
+
+                    <!-- Page 6: Battery Testing -->
+                    <div class="section-page" data-page="6">
+                        <div class="section-title">Battery Testing</div>
+                        <div class="form-group">
+                            <label for="ocv">OCV (Volts)</label>
+                            <input type="text" id="ocv" placeholder="Enter OCV">
+                        </div>
+                        <div class="form-group">
+                            <label for="start">Start (Volts)</label>
+                            <input type="text" id="start" placeholder="Enter Start voltage">
+                        </div>
+                        <div class="form-group">
+                            <label for="load">Load (Volts)</label>
+                            <input type="text" id="load" placeholder="Enter Load voltage">
+                        </div>
+                        <div class="form-group">
+                            <label for="impedance">Impedance (mOhms)</label>
+                            <input type="text" id="impedance" placeholder="Enter impedance">
+                        </div>
+
+                        <div class="navigation-buttons">
+                            <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
+                            <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
+                        </div>
+                    </div>
+
+                    <!-- Page 7: Cycle Testing -->
+                    <div class="section-page" data-page="7">
+                        <div class="section-title">Cycle Testing</div>
+                        <div class="form-group">
+                            <label for="cycles">Number of Cycles</label>
+                            <input type="number" id="cycles" placeholder="Enter number of cycles" oninput="checkCycleResult()">
+                        </div>
+
+                        <div class="form-group" id="cycleResultDisplay" style="display: none;">
+                            <label>Cycle Test Result</label>
+                            <div id="cycleResult" style="padding: 15px; border-radius: 8px; font-weight: 600; text-align: center; font-size: 18px;"></div>
+                            <p style="margin-top: 10px; color: #666; font-size: 14px;">Under 50 cycles = FAIL</p>
+                        </div>
+
+                        <div class="navigation-buttons">
+                            <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
+                            <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
+                        </div>
+                    </div>
+
+                    <!-- Page 8: Internal Inspection -->
+                    <div class="section-page" data-page="8">
+                        <div class="section-title">Internal Inspection</div>
+                        
+                        <div class="form-group">
+                            <label>PCB Connections</label>
+                            <div class="radio-group">
+                                <div class="radio-item" onclick="selectRadio('pcbConnections', 'pass')">
+                                    <input type="radio" name="pcbConnections" id="pcbConnectionsPass" value="Pass">
+                                    <label for="pcbConnectionsPass">✓ Pass</label>
+                                </div>
+                                <div class="radio-item fail" onclick="selectRadio('pcbConnections', 'fail')">
+                                    <input type="radio" name="pcbConnections" id="pcbConnectionsFail" value="Fail">
+                                    <label for="pcbConnectionsFail">✗ Fail</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Internal Casing</label>
+                            <div class="radio-group">
+                                <div class="radio-item" onclick="selectRadio('internalCasing', 'pass')">
+                                    <input type="radio" name="internalCasing" id="internalCasingPass" value="Pass">
+                                    <label for="internalCasingPass">✓ Pass</label>
+                                </div>
+                                <div class="radio-item fail" onclick="selectRadio('internalCasing', 'fail')">
+                                    <input type="radio" name="internalCasing" id="internalCasingFail" value="Fail">
+                                    <label for="internalCasingFail">✗ Fail</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Panel Socket Connections</label>
+                            <div class="radio-group">
+                                <div class="radio-item" onclick="selectRadio('panelSocketConnections', 'pass')">
+                                    <input type="radio" name="panelSocketConnections" id="panelSocketConnectionsPass" value="Pass">
+                                    <label for="panelSocketConnectionsPass">✓ Pass</label>
+                                </div>
+                                <div class="radio-item fail" onclick="selectRadio('panelSocketConnections', 'fail')">
+                                    <input type="radio" name="panelSocketConnections" id="panelSocketConnectionsFail" value="Fail">
+                                    <label for="panelSocketConnectionsFail">✗ Fail</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Test Button (Internal)</label>
+                            <div class="radio-group">
+                                <div class="radio-item" onclick="selectRadio('testButtonInternal', 'pass')">
+                                    <input type="radio" name="testButtonInternal" id="testButtonInternalPass" value="Pass">
+                                    <label for="testButtonInternalPass">✓ Pass</label>
+                                </div>
+                                <div class="radio-item fail" onclick="selectRadio('testButtonInternal', 'fail')">
+                                    <input type="radio" name="testButtonInternal" id="testButtonInternalFail" value="Fail">
+                                    <label for="testButtonInternalFail">✗ Fail</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Charger Socket</label>
+                            <div class="radio-group">
+                                <div class="radio-item" onclick="selectRadio('chargerSocket', 'pass')">
+                                    <input type="radio" name="chargerSocket" id="chargerSocketPass" value="Pass">
+                                    <label for="chargerSocketPass">✓ Pass</label>
+                                </div>
+                                <div class="radio-item fail" onclick="selectRadio('chargerSocket', 'fail')">
+                                    <input type="radio" name="chargerSocket" id="chargerSocketFail" value="Fail">
+                                    <label for="chargerSocketFail">✗ Fail</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Wiring (General)</label>
+                            <div class="radio-group">
+                                <div class="radio-item" onclick="selectRadio('wiringGeneral', 'pass')">
+                                    <input type="radio" name="wiringGeneral" id="wiringGeneralPass" value="Pass">
+                                    <label for="wiringGeneralPass">✓ Pass</label>
+                                </div>
+                                <div class="radio-item fail" onclick="selectRadio('wiringGeneral', 'fail')">
+                                    <input type="radio" name="wiringGeneral" id="wiringGeneralFail" value="Fail">
+                                    <label for="wiringGeneralFail">✗ Fail</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>PCB Test</label>
+                            <div class="radio-group">
+                                <div class="radio-item" onclick="selectRadio('pcbTest', 'pass')">
+                                    <input type="radio" name="pcbTest" id="pcbTestPass" value="Pass">
+                                    <label for="pcbTestPass">✓ Pass</label>
+                                </div>
+                                <div class="radio-item fail" onclick="selectRadio('pcbTest', 'fail')">
+                                    <input type="radio" name="pcbTest" id="pcbTestFail" value="Fail">
+                                    <label for="pcbTestFail">✗ Fail</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="navigation-buttons">
+                            <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
+                            <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
+                        </div>
+                    </div>
+
+                    <!-- Page 9: Parts Replaced -->
+                    <div class="section-page" data-page="9">
+                        <div class="section-title">Parts Replaced / Remedial Action</div>
+                        <div class="form-group">
+                            <label>Select all parts replaced or actions taken:</label>
+                            <div class="checkbox-group">
+                                <div class="checkbox-item" onclick="toggleCheckbox('partBattery')">
+                                    <input type="checkbox" id="partBattery">
+                                    <label for="partBattery">Battery</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('partClamps')">
+                                    <input type="checkbox" id="partClamps">
+                                    <label for="partClamps">Clamps</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('partShrouds')">
+                                    <input type="checkbox" id="partShrouds">
+                                    <label for="partShrouds">Shrouds</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('partTestButton')">
+                                    <input type="checkbox" id="partTestButton">
+                                    <label for="partTestButton">Test Button</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('partDCSocket')">
+                                    <input type="checkbox" id="partDCSocket">
+                                    <label for="partDCSocket">DC Socket</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('partCigLighter')">
+                                    <input type="checkbox" id="partCigLighter">
+                                    <label for="partCigLighter">Cig Lighter Socket</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('part2ACharger')">
+                                    <input type="checkbox" id="part2ACharger">
+                                    <label for="part2ACharger">2A Charger</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('partCleanJaws')">
+                                    <input type="checkbox" id="partCleanJaws">
+                                    <label for="partCleanJaws">Clean Jaws</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('partNewLabels')">
+                                    <input type="checkbox" id="partNewLabels">
+                                    <label for="partNewLabels">New Labels</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('partPanelSocket')">
+                                    <input type="checkbox" id="partPanelSocket">
+                                    <label for="partPanelSocket">Panel Socket</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('partFrontCase')">
+                                    <input type="checkbox" id="partFrontCase">
+                                    <label for="partFrontCase">Front Case</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('partRearCase')">
+                                    <input type="checkbox" id="partRearCase">
+                                    <label for="partRearCase">Rear Case</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('partFrontCaseSecondHand')">
+                                    <input type="checkbox" id="partFrontCaseSecondHand">
+                                    <label for="partFrontCaseSecondHand">Front Case (Second Hand)</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('partRearCaseSecondHand')">
+                                    <input type="checkbox" id="partRearCaseSecondHand">
+                                    <label for="partRearCaseSecondHand">Rear Case (Second Hand)</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('part5ACharger')">
+                                    <input type="checkbox" id="part5ACharger">
+                                    <label for="part5ACharger">5A Charger</label>
+                                </div>
+                                <div class="checkbox-item" onclick="toggleCheckbox('partCircuitBoard')">
+                                    <input type="checkbox" id="partCircuitBoard">
+                                    <label for="partCircuitBoard">Circuit Board</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="navigation-buttons">
+                            <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
+                            <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
+                        </div>
+                    </div>
+
+                    <!-- Page 10: Final Details -->
+                    <div class="section-page" data-page="10">
+                        <div class="section-title">Final Details</div>
+                        
+                        <div class="form-group">
+                            <label>Repair Category</label>
+                            <div class="radio-group" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                <div class="radio-item" onclick="selectRadio('category', 'warranty')" style="flex: none;">
+                                    <input type="radio" name="category" id="categoryWarranty" value="Warranty">
+                                    <span style="cursor: pointer;">Warranty</span>
+                                </div>
+                                <div class="radio-item" onclick="selectRadio('category', 'customer')" style="flex: none;">
+                                    <input type="radio" name="category" id="categoryCustomer" value="Customer Paying">
+                                    <span style="cursor: pointer;">Customer Paying</span>
+                                </div>
+                                <div class="radio-item" onclick="selectRadio('category', 'goodwill')" style="flex: none;">
+                                    <input type="radio" name="category" id="categoryGoodwill" value="Goodwill">
+                                    <span style="cursor: pointer;">Goodwill</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="fedexTracking">FedEx Return Tracking Number</label>
+                            <input type="text" id="fedexTracking" placeholder="Enter FedEx tracking number">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="additionalNotes">Notes or Additional Comments</label>
+                            <textarea id="additionalNotes" placeholder="Enter any additional notes or comments about this repair"></textarea>
+                        </div>
+
+                        <div class="navigation-buttons">
+                            <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
+                            <button type="button" class="btn btn-submit" onclick="submitForm()">Submit Repair Record</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Google Sheets Configuration
+        const SHEET_ID = '17_Sk7zQm4iYAFkxz5JF30TbQAY4AaJdyr8SWI4KiDHM';
+        const SERVICE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwW51YdOxzKzCK3S29fkOIhxg64OU3vyPB0bwElSr8bUjuHJtni9j4iuuCcYzuLauco/exec';
+        const REPAIR_HISTORY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxMY_chsqsRYDYmvcJs915aB0qKyf6wUXu5NzH_LhgOtpR_MixAVbOxay0K5XEmfpNp/exec';
+        
+        // Month GIDs - update these as you add new months
+        const MONTH_GIDS = {
+            1: null,  // JANUARY - add gid when available
+            2: null,  // FEBRUARY - add gid when available
+            3: null,  // MARCH - add gid when available
+            4: null,  // APRIL - add gid when available
+            5: null,  // MAY - add gid when available
+            6: null,  // JUNE - add gid when available
+            7: null,  // JULY - add gid when available
+            8: null,  // AUGUST - add gid when available
+            9: null,  // SEPTEMBER - add gid when available
+            10: null, // OCTOBER - add gid when available
+            11: 330568521, // NOVEMBER
+            12: 1114698946  // DECEMBER
+        };
+        
+        const MONTH_NAMES = [
+            'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+            'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'
+        ];
+        
+        // Get current month's gid
+        function getCurrentMonthGid() {
+            const currentMonth = new Date().getMonth() + 1; // 1-12
+            return MONTH_GIDS[currentMonth];
+        }
+        
+        // Get current month name
+        function getCurrentMonthName() {
+            const currentMonth = new Date().getMonth(); // 0-11
+            return MONTH_NAMES[currentMonth];
+        }
+        
+        // Local storage for battery date suggestions
+        const BATTERY_DATES_KEY = 'batteryDateSuggestions';
+        
+        let currentJobData = null;
+        let batteryDateSuggestions = [];
+        let currentPage = 1;
+        const totalPages = 10;
+        let allJobs = []; // Store all loaded jobs for filtering
+        let currentJobs = []; // Jobs that have arrived but not completed
+        let expectedJobs = []; // Jobs expected to arrive
+        let completedJobs = []; // Jobs with serial number filled in
+        let activeTab = 'current'; // current, expected, or completed
+
+        // Load battery date suggestions from local storage
+        function loadBatteryDateSuggestions() {
+            const stored = localStorage.getItem(BATTERY_DATES_KEY);
+            if (stored) {
+                batteryDateSuggestions = JSON.parse(stored);
+            }
+        }
+
+        // Save battery date to suggestions
+        function saveBatteryDateSuggestion(date) {
+            if (date && date.length === 8) {
+                if (!batteryDateSuggestions.includes(date)) {
+                    batteryDateSuggestions.unshift(date);
+                    // Keep only last 10 suggestions
+                    if (batteryDateSuggestions.length > 10) {
+                        batteryDateSuggestions = batteryDateSuggestions.slice(0, 10);
+                    }
+                    localStorage.setItem(BATTERY_DATES_KEY, JSON.stringify(batteryDateSuggestions));
+                }
+            }
+        }
+
+        // Display battery date suggestions
+        function displayBatteryDateSuggestions() {
+            const container = document.getElementById('dateSuggestions');
+            container.innerHTML = '';
+            batteryDateSuggestions.forEach(date => {
+                const btn = document.createElement('div');
+                btn.className = 'date-suggestion';
+                btn.textContent = date;
+                btn.onclick = () => {
+                    document.getElementById('batteryDate').value = date;
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        // Initialize battery date input listener
+        document.getElementById('batteryDate').addEventListener('input', function() {
+            displayBatteryDateSuggestions();
+        });
+
+        // Check cycle test result
+        function checkCycleResult() {
+            const cycles = parseInt(document.getElementById('cycles').value);
+            const resultDisplay = document.getElementById('cycleResultDisplay');
+            const resultDiv = document.getElementById('cycleResult');
+            
+            if (cycles >= 0) {
+                resultDisplay.style.display = 'block';
+                
+                if (cycles < 50) {
+                    resultDiv.style.background = '#f8d7da';
+                    resultDiv.style.color = '#721c24';
+                    resultDiv.style.border = '2px solid #dc3545';
+                    resultDiv.textContent = '✗ FAIL';
+                } else {
+                    resultDiv.style.background = '#d4edda';
+                    resultDiv.style.color = '#155724';
+                    resultDiv.style.border = '2px solid #28a745';
+                    resultDiv.textContent = '✓ PASS';
+                }
+            } else {
+                resultDisplay.style.display = 'none';
+            }
+        }
+
+        // Check charger type and show alert for 1.5a
+        function checkChargerType() {
+            const chargerType = document.getElementById('chargerType').value;
+            if (chargerType === '1.5a') {
+                alert('⚠️ 1.5 Amp Charger Detected\n\nThis charger should be upgraded to a 2 Amp charger.');
+            }
+        }
+
+        // Page navigation
+        function updateProgress() {
+            const progress = (currentPage / totalPages) * 100;
+            document.getElementById('progressFill').style.width = progress + '%';
+            document.getElementById('progressText').textContent = `Step ${currentPage} of ${totalPages}`;
+        }
+
+        function showPage(pageNum) {
+            // Hide all pages
+            document.querySelectorAll('.section-page').forEach(page => {
+                page.classList.remove('active');
+            });
+            
+            // Show current page
+            const page = document.querySelector(`.section-page[data-page="${pageNum}"]`);
+            if (page) {
+                page.classList.add('active');
+                currentPage = pageNum;
+                updateProgress();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function nextPage() {
+            if (currentPage < totalPages) {
+                // Skip page 2 if no charger/leads received
+                if (currentPage === 1) {
+                    const hasCharger = document.getElementById('receivedCharger').checked;
+                    const hasLeads = document.getElementById('receivedLeads').checked;
+                    if (!hasCharger && !hasLeads) {
+                        showPage(3); // Skip to page 3
+                        return;
+                    }
+                }
+                showPage(currentPage + 1);
+            }
+        }
+
+        function previousPage() {
+            if (currentPage > 1) {
+                // Skip page 2 backwards if no charger/leads
+                if (currentPage === 3) {
+                    const hasCharger = document.getElementById('receivedCharger').checked;
+                    const hasLeads = document.getElementById('receivedLeads').checked;
+                    if (!hasCharger && !hasLeads) {
+                        showPage(1); // Skip back to page 1
+                        return;
+                    }
+                }
+                showPage(currentPage - 1);
+            }
+        }
+
+        // Toggle checkbox visual state
+        function toggleCheckbox(id) {
+            const checkbox = document.getElementById(id);
+            const item = checkbox.closest('.checkbox-item');
+            checkbox.checked = !checkbox.checked;
+            if (checkbox.checked) {
+                item.classList.add('checked');
+            } else {
+                item.classList.remove('checked');
+            }
+        }
+
+        // Select radio button
+        function selectRadio(name, value) {
+            const radios = document.querySelectorAll(`input[name="${name}"]`);
+            radios.forEach(radio => {
+                const item = radio.closest('.radio-item');
+                
+                // Handle different radio button types
+                let shouldCheck = false;
+                if (value === 'pass' || value === 'fail') {
+                    shouldCheck = radio.value === (value === 'pass' ? 'Pass' : 'Fail');
+                } else if (value === 'warranty') {
+                    shouldCheck = radio.value === 'Warranty';
+                } else if (value === 'customer') {
+                    shouldCheck = radio.value === 'Customer Paying';
+                } else if (value === 'goodwill') {
+                    shouldCheck = radio.value === 'Goodwill';
+                }
+                
+                if (shouldCheck) {
+                    radio.checked = true;
+                    item.classList.add('checked');
+                } else {
+                    radio.checked = false;
+                    item.classList.remove('checked');
+                }
+            });
+        }
+
+        // Number pad functions
+        function addNumber(num) {
+            const input = document.getElementById('serialNumbers');
+            if (input.value.length < 5) {
+                input.value += num;
+            }
+        }
+
+        function clearNumbers() {
+            document.getElementById('serialNumbers').value = '';
+        }
+
+        function backspaceNumber() {
+            const input = document.getElementById('serialNumbers');
+            input.value = input.value.slice(0, -1);
+        }
+
+        // Simple CSV parser
+        function parseCSV(text) {
+            const rows = [];
+            let currentRow = [];
+            let currentField = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i + 1];
+                
+                if (char === '"') {
+                    if (inQuotes && nextChar === '"') {
+                        currentField += '"';
+                        i++; // Skip next quote
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    currentRow.push(currentField);
+                    currentField = '';
+                } else if ((char === '\n' || char === '\r') && !inQuotes) {
+                    if (char === '\r' && nextChar === '\n') {
+                        i++; // Skip \n in \r\n
+                    }
+                    if (currentField || currentRow.length > 0) {
+                        currentRow.push(currentField);
+                        rows.push(currentRow);
+                        currentRow = [];
+                        currentField = '';
+                    }
+                } else {
+                    currentField += char;
+                }
+            }
+            
+            // Add last field and row if not empty
+            if (currentField || currentRow.length > 0) {
+                currentRow.push(currentField);
+                rows.push(currentRow);
+            }
+            
+            return rows;
+        }
+
+        // Load jobs from Google Sheets
+        async function loadJobs() {
+            try {
+                console.log('Starting to load jobs...');
+                const currentGid = getCurrentMonthGid();
+                const currentMonth = getCurrentMonthName();
+                
+                console.log('Current month:', currentMonth, 'GID:', currentGid);
+                
+                if (currentGid === null) {
+                    document.getElementById('loadingJobs').innerHTML = 
+                        `<div class="error-message">No GID configured for ${currentMonth}. Please update the MONTH_GIDS in the code.</div>`;
+                    return;
+                }
+                
+                // Load current month's tab
+                const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${currentGid}`;
+                console.log('Fetching from URL:', url);
+                const response = await fetch(url);
+                const text = await response.text();
+                console.log('Received data, length:', text.length);
+                
+                // Parse CSV data
+                const rows = parseCSV(text);
+                console.log('Parsed rows:', rows.length);
+                
+                // Skip header row and convert to object format
+                const dataRows = rows.slice(1);
+                console.log('Data rows:', dataRows.length);
+                
+                const loadingJobs = document.getElementById('loadingJobs');
+                loadingJobs.classList.add('hidden');
+                
+                // Display current month
+                document.getElementById('currentMonthDisplay').textContent = `Viewing: ${currentMonth} ${new Date().getFullYear()}`;
+                
+                // Get today's date for comparison
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                console.log('Today:', today);
+                
+                // Get all rows with data
+                const allRows = dataRows.map(row => ({
+                    jobNumber: row[0] || '',
+                    dealerName: row[1] || '',
+                    customerName: row[6] || '',
+                    packReceived: row[5] || '',
+                    serialNumber: row[13] || '', // Column N - Serial Number (actually column O now but index 13 is correct)
+                    rowIndex: dataRows.indexOf(row) + 2
+                }));
+                
+                console.log('All rows processed:', allRows.length);
+                
+                // Separate jobs into categories
+                const jobsWithExp = [];
+                const jobsArrived = [];
+                const jobsCompleted = [];
+                
+                allRows.forEach(row => {
+                    const packReceived = row.packReceived;
+                    const hasSerialNumber = row.serialNumber && row.serialNumber.trim() !== '';
+                    
+                    if (!packReceived) return; // Skip empty rows
+                    
+                    // Check if it's an EXP date
+                    if (String(packReceived).toUpperCase().startsWith('EXP')) {
+                        const expectedDate = parseExpectedDate(packReceived);
+                        
+                        // If expected date is today or in the past, treat as arrived
+                        if (expectedDate && expectedDate <= today) {
+                            if (hasSerialNumber) {
+                                jobsCompleted.push({ ...row, type: 'completed' });
+                            } else {
+                                const receivedDate = expectedDate;
+                                jobsArrived.push({ ...row, receivedDate, type: 'current' });
+                            }
+                        } else {
+                            // Still in the future
+                            jobsWithExp.push({ ...row, expectedDate, type: 'expected' });
+                        }
+                    } else {
+                        // Has actual date (not EXP)
+                        if (hasSerialNumber) {
+                            jobsCompleted.push({ ...row, type: 'completed' });
+                        } else {
+                            const receivedDate = parseDateFromSheet(packReceived);
+                            jobsArrived.push({ ...row, receivedDate, type: 'current' });
+                        }
+                    }
+                });
+                
+                console.log('Jobs with EXP:', jobsWithExp.length);
+                console.log('Jobs arrived:', jobsArrived.length);
+                console.log('Jobs completed:', jobsCompleted.length);
+                
+                // Sort expected jobs by date (earliest first)
+                expectedJobs = jobsWithExp.sort((a, b) => {
+                    if (a.expectedDate && b.expectedDate) {
+                        return a.expectedDate - b.expectedDate;
+                    }
+                    return 0;
+                });
+                
+                // Sort current jobs by job number
+                currentJobs = jobsArrived.sort((a, b) => {
+                    return a.jobNumber.localeCompare(b.jobNumber);
+                });
+                
+                // Sort completed jobs by job number (newest first)
+                completedJobs = jobsCompleted.sort((a, b) => {
+                    return b.jobNumber.localeCompare(a.jobNumber);
+                });
+
+                allJobs = [...currentJobs, ...expectedJobs, ...completedJobs];
+                
+                // Update counts
+                document.getElementById('currentCount').textContent = currentJobs.length;
+                document.getElementById('expectedCount').textContent = expectedJobs.length;
+                document.getElementById('completedCount').textContent = completedJobs.length;
+                
+                console.log('Counts updated. Showing today jobs...');
+                
+                // Set today's date in the date filter (reuse today variable from above)
+                const todayStr = today.toISOString().split('T')[0];
+                document.getElementById('dateFilter').value = todayStr;
+                
+                // Show today's jobs initially
+                showTodayJobs();
+                
+            } catch (error) {
+                console.error('Error loading jobs:', error);
+                document.getElementById('loadingJobs').innerHTML = 
+                    '<div class="error-message">Error loading jobs. Please refresh the page.</div>';
+            }
+        }
+
+        // Parse expected date from "EXP DD/MM" format
+        function parseExpectedDate(expStr) {
+            if (!expStr) return null;
+            
+            // Extract date from "EXP 28/11" format
+            const match = expStr.match(/EXP\s*(\d{1,2})\/(\d{1,2})/i);
+            if (match) {
+                const day = parseInt(match[1]);
+                const month = parseInt(match[2]) - 1; // months are 0-indexed
+                const year = new Date().getFullYear();
+                return new Date(year, month, day);
+            }
+            return null;
+        }
+
+        // Check if date is today, tomorrow, or soon
+        function getDateCategory(expectedDate) {
+            if (!expectedDate) return 'future';
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            
+            const weekFromNow = new Date(today);
+            weekFromNow.setDate(weekFromNow.getDate() + 7);
+            
+            const expDate = new Date(expectedDate);
+            expDate.setHours(0, 0, 0, 0);
+            
+            if (expDate.getTime() === today.getTime()) return 'today';
+            if (expDate.getTime() === tomorrow.getTime()) return 'tomorrow';
+            if (expDate <= weekFromNow) return 'soon';
+            return 'future';
+        }
+
+        // Switch between current, expected, and completed tabs
+        function showJobTab(tab) {
+            activeTab = tab;
+            
+            // Update tab styling
+            document.getElementById('tabCurrent').classList.toggle('active', tab === 'current');
+            document.getElementById('tabExpected').classList.toggle('active', tab === 'expected');
+            document.getElementById('tabCompleted').classList.toggle('active', tab === 'completed');
+            
+            // Clear search and date filters
+            document.getElementById('dateFilter').value = '';
+            document.getElementById('searchJob').value = '';
+            
+            // Show appropriate jobs
+            if (tab === 'current') {
+                displayJobs(currentJobs);
+            } else if (tab === 'expected') {
+                displayExpectedJobs(expectedJobs);
+            } else {
+                displayCompletedJobs(completedJobs);
+            }
+        }
+
+        // Display completed jobs
+        function displayCompletedJobs(jobs) {
+            const jobList = document.getElementById('jobList');
+            const jobCount = document.getElementById('jobCount');
+            
+            jobList.innerHTML = '';
+            
+            if (jobs.length === 0) {
+                jobList.innerHTML = '<p style="text-align: center; color: #666;">No completed repairs yet.</p>';
+                jobCount.textContent = '';
+                return;
+            }
+            
+            jobCount.textContent = `Showing ${jobs.length} completed repair${jobs.length !== 1 ? 's' : ''}`;
+            
+            // Display jobs
+            jobs.forEach(job => {
+                const card = document.createElement('div');
+                card.className = 'job-card repair-completed';
+                card.innerHTML = `
+                    <div class="job-card-number">✓ ${job.jobNumber}</div>
+                    <div class="job-card-customer">${job.customerName || job.dealerName}</div>
+                    <div style="font-size: 14px; color: #999; margin-top: 5px;">Serial: ${job.serialNumber}</div>
+                    <div style="font-size: 14px; color: #28a745; margin-top: 5px; font-weight: 600;">COMPLETED</div>
+                `;
+                // Completed jobs can still be clicked to view/edit
+                card.onclick = () => selectJob(job);
+                jobList.appendChild(card);
+            });
+        }
+
+        // Display expected jobs with date highlighting
+        function displayExpectedJobs(jobs) {
+            const jobList = document.getElementById('jobList');
+            const jobCount = document.getElementById('jobCount');
+            
+            jobList.innerHTML = '';
+            
+            if (jobs.length === 0) {
+                jobList.innerHTML = '<p style="text-align: center; color: #666;">No expected arrivals.</p>';
+                jobCount.textContent = '';
+                return;
+            }
+            
+            jobCount.textContent = `Showing ${jobs.length} expected arrival${jobs.length !== 1 ? 's' : ''}`;
+            
+            // Display jobs
+            jobs.forEach(job => {
+                const category = getDateCategory(job.expectedDate);
+                let categoryClass = '';
+                let categoryLabel = '';
+                
+                if (category === 'today') {
+                    categoryClass = 'expected-today';
+                    categoryLabel = '📦 Arriving TODAY';
+                } else if (category === 'tomorrow') {
+                    categoryClass = 'expected-tomorrow';
+                    categoryLabel = '📅 Arriving TOMORROW';
+                } else if (category === 'soon') {
+                    categoryClass = 'expected-soon';
+                    categoryLabel = '🔜 Arriving This Week';
+                }
+                
+                const card = document.createElement('div');
+                card.className = 'job-card ' + categoryClass;
+                card.innerHTML = `
+                    <div class="job-card-number">${job.jobNumber}</div>
+                    <div class="job-card-customer">${job.customerName || job.dealerName}</div>
+                    <div style="font-size: 14px; color: #666; margin-top: 5px;">Expected: ${job.packReceived}</div>
+                    ${categoryLabel ? `<div style="font-weight: 600; margin-top: 8px; color: #333;">${categoryLabel}</div>` : ''}
+                `;
+                // Expected jobs are not clickable (can't start repair until they arrive)
+                card.style.cursor = 'default';
+                card.onclick = null;
+                jobList.appendChild(card);
+            });
+        }
+
+        // Display jobs in the list
+        function displayJobs(jobs) {
+            const jobList = document.getElementById('jobList');
+            const jobCount = document.getElementById('jobCount');
+            
+            jobList.innerHTML = '';
+            
+            if (jobs.length === 0) {
+                jobList.innerHTML = '<p style="text-align: center; color: #666;">No jobs found matching your criteria.</p>';
+                jobCount.textContent = '';
+                return;
+            }
+            
+            jobCount.textContent = `Showing ${jobs.length} job${jobs.length !== 1 ? 's' : ''}`;
+            
+            // Get today's date for comparison
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // Display jobs
+            jobs.forEach(job => {
+                let categoryClass = '';
+                let categoryLabel = '';
+                
+                // Check if received today (either EXP date or actual date)
+                if (job.receivedDate) {
+                    const recDate = new Date(job.receivedDate);
+                    recDate.setHours(0, 0, 0, 0);
+                    
+                    if (recDate.getTime() === today.getTime()) {
+                        categoryClass = 'repair-today';
+                        categoryLabel = '📦 DUE TODAY';
+                    }
+                }
+                
+                const card = document.createElement('div');
+                card.className = 'job-card ' + categoryClass;
+                card.innerHTML = `
+                    <div class="job-card-number">${job.jobNumber}</div>
+                    <div class="job-card-customer">${job.customerName || job.dealerName}</div>
+                    <div style="font-size: 14px; color: #999; margin-top: 5px;">
+                        ${job.packReceived ? 'Due: ' + job.packReceived : ''}
+                    </div>
+                    ${categoryLabel ? `<div style="font-weight: 700; margin-top: 8px; color: #155724; font-size: 16px; background: #d4edda; padding: 8px; border-radius: 6px; text-align: center;">${categoryLabel}</div>` : ''}
+                `;
+                card.onclick = () => selectJob(job);
+                jobList.appendChild(card);
+            });
+        }
+
+        // Filter jobs based on date and search
+        function filterJobs() {
+            const dateFilter = document.getElementById('dateFilter').value;
+            const searchTerm = document.getElementById('searchJob').value.toUpperCase().trim();
+            
+            let filteredJobs;
+            if (activeTab === 'current') {
+                filteredJobs = currentJobs;
+            } else if (activeTab === 'expected') {
+                filteredJobs = expectedJobs;
+            } else {
+                filteredJobs = completedJobs;
+            }
+            
+            // Filter by search term if provided
+            if (searchTerm) {
+                filteredJobs = filteredJobs.filter(job => 
+                    job.jobNumber.toUpperCase().includes(searchTerm)
+                );
+            }
+            
+            // Filter by date if provided (only for current jobs)
+            if (dateFilter && activeTab === 'current') {
+                filteredJobs = filteredJobs.filter(job => {
+                    // Try to parse the pack received date
+                    const packDate = parseDateFromSheet(job.packReceived);
+                    if (packDate) {
+                        const filterDate = new Date(dateFilter);
+                        return packDate.toDateString() === filterDate.toDateString();
+                    }
+                    return false;
+                });
+            }
+            
+            if (activeTab === 'current') {
+                displayJobs(filteredJobs);
+            } else if (activeTab === 'expected') {
+                displayExpectedJobs(filteredJobs);
+            } else {
+                displayCompletedJobs(filteredJobs);
+            }
+        }
+
+        // Parse date from various formats in the sheet
+        function parseDateFromSheet(dateStr) {
+            if (!dateStr) return null;
+            
+            // Try standard date formats
+            const date = new Date(dateStr);
+            if (!isNaN(date.getTime())) {
+                return date;
+            }
+            
+            // Try UK format DD/MM/YYYY
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+                const day = parseInt(parts[0]);
+                const month = parseInt(parts[1]) - 1; // months are 0-indexed
+                const year = parseInt(parts[2]);
+                if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+                    return new Date(year, month, day);
+                }
+            }
+            
+            return null;
+        }
+
+        // Show all active jobs
+        function showAllJobs() {
+            document.getElementById('dateFilter').value = '';
+            document.getElementById('searchJob').value = '';
+            if (activeTab === 'current') {
+                displayJobs(currentJobs);
+            } else if (activeTab === 'expected') {
+                displayExpectedJobs(expectedJobs);
+            } else {
+                displayCompletedJobs(completedJobs);
+            }
+        }
+
+        // Show today's jobs
+        function showTodayJobs() {
+            // Switch to current tab and show all current jobs
+            // (Jobs are already filtered to today/past EXP dates in loadJobs)
+            showJobTab('current');
+            document.getElementById('dateFilter').value = '';
+            document.getElementById('searchJob').value = '';
+            displayJobs(currentJobs);
+        }
+
+        // Select a job and show repair form
+        function selectJob(job) {
+            currentJobData = job;
+            document.getElementById('currentJobNumber').textContent = job.jobNumber;
+            document.getElementById('currentCustomerName').textContent = job.customerName || job.dealerName;
+            
+            document.getElementById('jobSelector').classList.add('hidden');
+            document.getElementById('repairForm').classList.remove('hidden');
+            
+            // Reset to first page
+            showPage(1);
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+
+        // Go back to job selector
+        function backToJobSelector() {
+            document.getElementById('repairForm').classList.add('hidden');
+            document.getElementById('jobSelector').classList.remove('hidden');
+            document.getElementById('mainForm').reset();
+            document.getElementById('successMessage').classList.add('hidden');
+            document.getElementById('errorMessage').classList.add('hidden');
+            
+            // Clear all visual states
+            document.querySelectorAll('.checkbox-item.checked').forEach(item => {
+                item.classList.remove('checked');
+            });
+            document.querySelectorAll('.radio-item.checked').forEach(item => {
+                item.classList.remove('checked');
+            });
+            
+            // Reset to page 1
+            showPage(1);
+        }
+
+        // Collect form data
+        function collectFormData() {
+            const cycles = parseInt(document.getElementById('cycles').value) || 0;
+            const cycleResult = cycles < 50 ? 'Fail' : 'Pass';
+            
+            const data = {
+                jobNumber: currentJobData.jobNumber,
+                customerName: currentJobData.customerName || currentJobData.dealerName,
+                popDate: document.getElementById('popDate').value,
+                serialNumber: document.getElementById('serialPrefix').value + document.getElementById('serialNumbers').value,
+                batteryDate: document.getElementById('batteryDate').value,
+                batteryMake: document.getElementById('batteryMake').value,
+                ocv: document.getElementById('ocv').value,
+                start: document.getElementById('start').value,
+                load: document.getElementById('load').value,
+                impedance: document.getElementById('impedance').value,
+                batteryPassFail: cycleResult, // Column W - based on cycles
+                chargerType: document.getElementById('chargerType').value,
+                chargerFloat: document.getElementById('chargerFloat').value,
+                chargerBulk: document.getElementById('chargerBulk').value,
+                chargerMaxCurrent: document.getElementById('chargerMaxCurrent').value,
+                chargerPassFail: document.querySelector('input[name="chargerTest"]:checked')?.value || '',
+                receivedLeads: document.getElementById('receivedLeads').checked,
+                receivedCharger: document.getElementById('receivedCharger').checked,
+                clampsStatus: document.getElementById('receivedLeads').checked ? 'Both' : 'None', // Column Z
+                clampsPassFail: document.querySelector('input[name="clampsTest"]:checked')?.value || '', // Column AA
+                category: document.querySelector('input[name="category"]:checked')?.value || '', // Column AB
+                fedexTracking: document.getElementById('fedexTracking').value,
+                cycles: cycles,
+                cycleResult: cycleResult,
+                // Inspection results (for repair history sheet, not main comments)
+                panelSockets: document.querySelector('input[name="panelSockets"]:checked')?.value || '',
+                lightsState: document.querySelector('input[name="lightsState"]:checked')?.value || '',
+                pcbConnections: document.querySelector('input[name="pcbConnections"]:checked')?.value || '',
+                internalCasing: document.querySelector('input[name="internalCasing"]:checked')?.value || '',
+                panelSocketConnections: document.querySelector('input[name="panelSocketConnections"]:checked')?.value || '',
+                testButtonInternal: document.querySelector('input[name="testButtonInternal"]:checked')?.value || '',
+                chargerSocket: document.querySelector('input[name="chargerSocket"]:checked')?.value || '',
+                wiringGeneral: document.querySelector('input[name="wiringGeneral"]:checked')?.value || '',
+                pcbTest: document.querySelector('input[name="pcbTest"]:checked')?.value || '',
+                // User's own comments only
+                additionalNotes: document.getElementById('additionalNotes').value,
+                parts: {
+                    battery: document.getElementById('partBattery').checked,
+                    clamps: document.getElementById('partClamps').checked,
+                    shrouds: document.getElementById('partShrouds').checked,
+                    testButton: document.getElementById('partTestButton').checked,
+                    dcSocket: document.getElementById('partDCSocket').checked,
+                    cigLighter: document.getElementById('partCigLighter').checked,
+                    charger2A: document.getElementById('part2ACharger').checked,
+                    cleanJaws: document.getElementById('partCleanJaws').checked,
+                    newLabels: document.getElementById('partNewLabels').checked,
+                    panelSocket: document.getElementById('partPanelSocket').checked,
+                    frontCase: document.getElementById('partFrontCase').checked,
+                    rearCase: document.getElementById('partRearCase').checked,
+                    frontCaseSecondHand: document.getElementById('partFrontCaseSecondHand').checked,
+                    rearCaseSecondHand: document.getElementById('partRearCaseSecondHand').checked,
+                    charger5A: document.getElementById('part5ACharger').checked,
+                    circuitBoard: document.getElementById('partCircuitBoard').checked
+                }
+            };
+            
+            return data;
+        }
+
+        // Handle form submission
+        function submitForm() {
+            const data = collectFormData();
+            
+            console.log('Submitting repair data:', data);
+            
+            // Save battery date suggestion
+            saveBatteryDateSuggestion(data.batteryDate);
+            
+            // Show loading state
+            const submitButton = document.querySelector('.btn-submit');
+            const originalText = submitButton.textContent;
+            submitButton.textContent = 'Saving...';
+            submitButton.disabled = true;
+            
+            // Send to SERVICE sheet
+            const servicePromise = fetch(SERVICE_SCRIPT_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain',
+                },
+                body: JSON.stringify(data)
+            });
+            
+            // Send to REPAIR HISTORY sheet (if URL is configured)
+            let historyPromise = Promise.resolve();
+            if (REPAIR_HISTORY_SCRIPT_URL) {
+                historyPromise = fetch(REPAIR_HISTORY_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain',
+                    },
+                    body: JSON.stringify(data)
+                });
+            }
+            
+            // Wait for both to complete
+            Promise.all([servicePromise, historyPromise])
+            .then(() => {
+                console.log('Data saved successfully to both sheets');
+                document.getElementById('successMessage').classList.remove('hidden');
+                document.getElementById('errorMessage').classList.add('hidden');
+                
+                // Scroll to top to show success message
+                window.scrollTo(0, 0);
+                
+                // Show success alert
+                alert('Repair record saved!\n\nData has been written to:\n✓ Service Sheet\n' + (REPAIR_HISTORY_SCRIPT_URL ? '✓ Repair History Sheet' : ''));
+                
+                // Re-enable button
+                submitButton.textContent = originalText;
+                submitButton.disabled = false;
+                
+                // Reset form and go back to job selector after 2 seconds
+                setTimeout(() => {
+                    backToJobSelector();
+                    // Reload jobs to update completed status
+                    loadJobs();
+                }, 2000);
+            })
+            .catch(error => {
+                console.error('Error saving data:', error);
+                document.getElementById('errorMessage').textContent = 'Error saving data: ' + error.message + '. Check console for details.';
+                document.getElementById('errorMessage').classList.remove('hidden');
+                document.getElementById('successMessage').classList.add('hidden');
+                
+                // Re-enable button
+                submitButton.textContent = originalText;
+                submitButton.disabled = false;
+                
+                // Scroll to top to show error
+                window.scrollTo(0, 0);
+            });
+        }
+
+        // Initialize
+        loadBatteryDateSuggestions();
+        displayBatteryDateSuggestions();
+        loadJobs();
+        updateProgress();
+    </script>
+</body>
+</html>
