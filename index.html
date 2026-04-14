@@ -18,6 +18,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .back-to-jobs-btn:hover { background: #a01729; transform: translateX(-3px); }
 .job-info-item { font-size: 18px; font-weight: 600; }
 .job-info-label { color: #aaa; font-size: 12px; font-weight: normal; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+.customer-address { font-size: 13px; color: #bbb; margin-top: 3px; font-weight: normal; }
 
 .form-section { padding: 30px; }
 .section-page { display: none; animation: fadeIn 0.3s; }
@@ -32,11 +33,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 .form-group { margin-bottom: 25px; }
 label { display: block; font-weight: 600; margin-bottom: 8px; color: #333; font-size: 16px; }
-input[type="text"], input[type="number"], input[type="date"], textarea, select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; font-family: inherit; }
+.sub-label { font-size: 14px; color: #666; font-weight: normal; }
+input[type="text"], input[type="number"], input[type="date"], textarea, select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; font-family: inherit; background: white; }
 input:focus, textarea:focus, select:focus { outline: none; border-color: #c41e3a; }
 textarea { resize: vertical; min-height: 80px; }
 
-/* Subtle date row on page 1 */
 .date-row { display: flex; align-items: center; gap: 10px; background: #f8f9fa; padding: 10px 14px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e0e0e0; font-size: 14px; }
 .date-row .date-label { color: #666; }
 .date-row .date-value { font-weight: 600; color: #1a2332; flex: 1; }
@@ -52,19 +53,27 @@ textarea { resize: vertical; min-height: 80px; }
 
 .radio-group { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px; }
 .radio-group.three-col { grid-template-columns: repeat(3, 1fr); }
-.radio-item { display: flex; align-items: center; justify-content: center; background: #f8f9fa; padding: 16px 20px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; font-weight: 600; font-size: 16px; user-select: none; }
+.radio-group.sub { margin-top: 8px; }
+.radio-item { display: flex; align-items: center; justify-content: center; background: #f8f9fa; padding: 16px 20px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; font-weight: 600; font-size: 16px; user-select: none; text-align: center; }
+.radio-item.small { padding: 10px 14px; font-size: 14px; }
 .radio-item:hover { background: #e9ecef; }
 .radio-item input[type="radio"] { display: none; }
 .radio-item.checked { background: #d4edda; border-color: #28a745; color: #155724; }
 .radio-item.fail.checked { background: #f8d7da; border-color: #dc3545; color: #721c24; }
 .radio-item.neutral.checked { background: #d1ecf1; border-color: #17a2b8; color: #0c5460; }
+.radio-item.warranty.checked { background: #8B0000; border-color: #8B0000; color: white; }
+.radio-item.paid.checked { background: #34a853; border-color: #34a853; color: white; }
+.radio-item.goodwill.checked { background: #fbbc04; border-color: #fbbc04; color: #1a2332; }
 
-/* Pass/Fail card row used on page 2 */
 .pf-row { display: grid; grid-template-columns: 1fr; gap: 18px; }
 .pf-card { background: #fff; border: 2px solid #e0e0e0; border-radius: 10px; padding: 16px; }
 .pf-card .pf-title { font-size: 17px; font-weight: 700; color: #1a2332; margin-bottom: 12px; }
+.pf-card.disabled { opacity: 0.45; background: #f0f0f0; }
+.pf-card.disabled .pf-title::after { content: ' (not received)'; font-weight: normal; color: #999; font-size: 14px; }
 
-/* Serial number block */
+.charger-type-block { margin-top: 14px; padding-top: 14px; border-top: 1px solid #e0e0e0; }
+.charger-type-block .sub-label { margin-bottom: 8px; display: block; }
+
 .serial-block { background: #f8f9fa; border-radius: 10px; padding: 18px; border: 2px solid #e0e0e0; }
 .serial-display { display: flex; gap: 10px; align-items: stretch; margin-bottom: 16px; }
 .serial-prefix-select { flex: 0 0 110px; }
@@ -141,48 +150,26 @@ textarea { resize: vertical; min-height: 80px; }
         <p>Streamlined Repair Documentation</p>
     </div>
 
-    <!-- Job Selection Screen -->
     <div id="jobSelector" class="job-selector">
         <h2 class="section-title">Select a Job to Begin Repair</h2>
         <div style="text-align: center; color: #1a2332; font-weight: 600; margin-bottom: 20px; font-size: 16px;" id="currentMonthDisplay"></div>
 
         <div class="stats-dashboard">
-            <div class="stat-card stat-today">
-                <div class="stat-number" id="statToday">0</div>
-                <div class="stat-label">Due Today</div>
-            </div>
-            <div class="stat-card stat-current">
-                <div class="stat-number" id="statCurrent">0</div>
-                <div class="stat-label">Current Repairs</div>
-            </div>
-            <div class="stat-card stat-completed">
-                <div class="stat-number" id="statCompleted">0</div>
-                <div class="stat-label">Completed This Month</div>
-            </div>
+            <div class="stat-card stat-today"><div class="stat-number" id="statToday">0</div><div class="stat-label">Due Today</div></div>
+            <div class="stat-card stat-current"><div class="stat-number" id="statCurrent">0</div><div class="stat-label">Current Repairs</div></div>
+            <div class="stat-card stat-completed"><div class="stat-number" id="statCompleted">0</div><div class="stat-label">Completed This Month</div></div>
         </div>
 
         <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e0e0e0;">
-            <button id="tabCurrent" class="job-tab active" onclick="showJobTab('current')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid #c41e3a; color: #c41e3a;">
-                Current (<span id="currentCount">0</span>)
-            </button>
-            <button id="tabExpected" class="job-tab" onclick="showJobTab('expected')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; color: #999;">
-                Expected (<span id="expectedCount">0</span>)
-            </button>
-            <button id="tabCompleted" class="job-tab" onclick="showJobTab('completed')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; color: #999;">
-                Completed (<span id="completedCount">0</span>)
-            </button>
+            <button id="tabCurrent" class="job-tab active" onclick="showJobTab('current')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid #c41e3a; color: #c41e3a;">Current (<span id="currentCount">0</span>)</button>
+            <button id="tabExpected" class="job-tab" onclick="showJobTab('expected')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; color: #999;">Expected (<span id="expectedCount">0</span>)</button>
+            <button id="tabCompleted" class="job-tab" onclick="showJobTab('completed')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; color: #999;">Completed (<span id="completedCount">0</span>)</button>
         </div>
 
         <div style="margin-bottom: 25px;">
             <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-                <div style="flex: 1;">
-                    <label for="dateFilter" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Filter by Date:</label>
-                    <input type="date" id="dateFilter" onchange="filterJobs()">
-                </div>
-                <div style="flex: 1;">
-                    <label for="searchJob" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Search Job Number:</label>
-                    <input type="text" id="searchJob" placeholder="e.g., R1101" oninput="filterJobs()">
-                </div>
+                <div style="flex: 1;"><label for="dateFilter">Filter by Date:</label><input type="date" id="dateFilter" onchange="filterJobs()"></div>
+                <div style="flex: 1;"><label for="searchJob">Search Job Number:</label><input type="text" id="searchJob" placeholder="e.g., R1101" oninput="filterJobs()"></div>
             </div>
             <button onclick="showAllJobs()" style="padding: 10px 20px; background: #1a2332; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Show All</button>
             <button onclick="showTodayJobs()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; margin-left: 10px;">Today's Jobs</button>
@@ -193,19 +180,14 @@ textarea { resize: vertical; min-height: 80px; }
         <div class="job-list" id="jobList"></div>
     </div>
 
-    <!-- Repair Form Screen -->
     <div id="repairForm" class="hidden">
         <div class="job-info">
-            <button class="back-to-jobs-btn" onclick="backToJobSelector()">
-                <span style="font-size: 18px;">←</span> Back
-            </button>
-            <div class="job-info-item">
-                <span class="job-info-label">Job Number</span>
-                <span id="currentJobNumber">-</span>
-            </div>
-            <div class="job-info-item">
+            <button class="back-to-jobs-btn" onclick="backToJobSelector()"><span style="font-size: 18px;">←</span> Back</button>
+            <div class="job-info-item"><span class="job-info-label">Job Number</span><span id="currentJobNumber">-</span></div>
+            <div class="job-info-item" style="text-align: right;">
                 <span class="job-info-label">Customer</span>
                 <span id="currentCustomerName">-</span>
+                <div class="customer-address" id="currentCustomerAddress"></div>
             </div>
         </div>
 
@@ -214,70 +196,56 @@ textarea { resize: vertical; min-height: 80px; }
             <div id="errorMessage" class="error-message hidden"></div>
 
             <div class="progress-text"><span id="progressText">Step 1 of 5</span></div>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill" style="width: 20%"></div>
-            </div>
+            <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width: 20%"></div></div>
 
             <form id="mainForm">
 
-                <!-- PAGE 1: Package received date + Items received -->
                 <div class="section-page active" data-page="1">
                     <div class="section-title">Package Received</div>
-
                     <div class="date-row">
                         <span class="date-label">Received:</span>
                         <span class="date-value" id="receivedDateDisplay">Today</span>
                         <input type="date" id="receivedDate" class="hidden">
                         <button type="button" class="edit-date-btn" onclick="toggleDateEdit()">edit</button>
                     </div>
-
                     <div class="form-group">
                         <label>Items received</label>
                         <div class="checkbox-group">
-                            <div class="checkbox-item checked" onclick="toggleCheckbox('receivedPack')">
-                                <input type="checkbox" id="receivedPack" checked>
-                                <label>Pack</label>
-                            </div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('receivedLeads')">
-                                <input type="checkbox" id="receivedLeads">
-                                <label>Leads</label>
-                            </div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('receivedCharger')">
-                                <input type="checkbox" id="receivedCharger">
-                                <label>Charger</label>
-                            </div>
+                            <div class="checkbox-item checked" onclick="toggleCheckbox('receivedPack')"><input type="checkbox" id="receivedPack" checked><label>Pack</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('receivedLeads')"><input type="checkbox" id="receivedLeads"><label>Leads</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('receivedCharger')"><input type="checkbox" id="receivedCharger"><label>Charger</label></div>
                         </div>
                     </div>
-
-                    <div class="validation-msg" id="validation1">Please confirm the received date and items.</div>
-
-                    <div class="navigation-buttons">
-                        <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
-                    </div>
+                    <div class="validation-msg" id="validation1">Please confirm the received date.</div>
+                    <div class="navigation-buttons"><button type="button" class="btn btn-next" onclick="nextPage()">Next →</button></div>
                     <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
 
-                <!-- PAGE 2: Pass/Fail tests -->
                 <div class="section-page" data-page="2">
                     <div class="section-title">Initial Tests</div>
-
                     <div class="pf-row">
-                        <div class="pf-card">
+                        <div class="pf-card" id="cardCharger">
                             <div class="pf-title">Charger</div>
                             <div class="radio-group">
                                 <div class="radio-item" data-pf="chargerTest" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
                                 <div class="radio-item fail" data-pf="chargerTest" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
                             </div>
+                            <div class="charger-type-block">
+                                <span class="sub-label">Charger type:</span>
+                                <div class="radio-group three-col sub">
+                                    <div class="radio-item small" data-pf="chargerType" data-val="2AH" onclick="selectPF(this)">2AH</div>
+                                    <div class="radio-item small" data-pf="chargerType" data-val="5AH" onclick="selectPF(this)">5AH</div>
+                                    <div class="radio-item small neutral" data-pf="chargerType" data-val="NOT OURS" onclick="selectPF(this)">NOT OURS</div>
+                                </div>
+                            </div>
                         </div>
-
-                        <div class="pf-card">
+                        <div class="pf-card" id="cardLeads">
                             <div class="pf-title">Leads</div>
                             <div class="radio-group">
                                 <div class="radio-item" data-pf="leadsTest" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
                                 <div class="radio-item fail" data-pf="leadsTest" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
                             </div>
                         </div>
-
                         <div class="pf-card">
                             <div class="pf-title">Panel Sockets</div>
                             <div class="radio-group">
@@ -285,7 +253,6 @@ textarea { resize: vertical; min-height: 80px; }
                                 <div class="radio-item fail" data-pf="panelSockets" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
                             </div>
                         </div>
-
                         <div class="pf-card">
                             <div class="pf-title">Lights on Pack</div>
                             <div class="radio-group">
@@ -294,9 +261,7 @@ textarea { resize: vertical; min-height: 80px; }
                             </div>
                         </div>
                     </div>
-
-                    <div class="validation-msg" id="validation2">All four tests must be marked Pass or Fail before continuing.</div>
-
+                    <div class="validation-msg" id="validation2">All visible tests must be completed before continuing.</div>
                     <div class="navigation-buttons">
                         <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
                         <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
@@ -304,19 +269,14 @@ textarea { resize: vertical; min-height: 80px; }
                     <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
 
-                <!-- PAGE 3: Serial number, Battery make, Pack test -->
                 <div class="section-page" data-page="3">
                     <div class="section-title">Pack Inspection</div>
-
                     <div class="form-group">
                         <label>Serial Number</label>
                         <div class="serial-block">
                             <div class="serial-display">
                                 <div class="serial-prefix-select">
-                                    <select id="serialPrefix">
-                                        <option value="NA">NA</option>
-                                        <option value="DZ1H">DZ1H</option>
-                                    </select>
+                                    <select id="serialPrefix"><option value="NA">NA</option><option value="DZ1H">DZ1H</option></select>
                                 </div>
                                 <div class="serial-digits empty" id="serialDigits">_____</div>
                             </div>
@@ -336,16 +296,18 @@ textarea { resize: vertical; min-height: 80px; }
                             </div>
                         </div>
                     </div>
-
+                    <div class="form-group">
+                        <label for="popDate">P.O.P. Date <span class="sub-label">(Date Pack Originally Sold — optional)</span></label>
+                        <input type="date" id="popDate">
+                    </div>
                     <div class="form-group">
                         <label>Battery Make</label>
                         <div class="radio-group three-col">
                             <div class="radio-item" data-pf="batteryMake" data-val="BB22" onclick="selectPF(this)">BB22</div>
                             <div class="radio-item" data-pf="batteryMake" data-val="BB24" onclick="selectPF(this)">BB24</div>
-                            <div class="radio-item neutral" data-pf="batteryMake" data-val="Not Ours" onclick="selectPF(this)">Not Ours</div>
+                            <div class="radio-item neutral" data-pf="batteryMake" data-val="NOT OURS" onclick="selectPF(this)">NOT OURS</div>
                         </div>
                     </div>
-
                     <div class="form-group">
                         <label>Pack Test</label>
                         <div class="radio-group">
@@ -353,9 +315,7 @@ textarea { resize: vertical; min-height: 80px; }
                             <div class="radio-item fail" data-pf="packTest" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
                         </div>
                     </div>
-
-                    <div class="validation-msg" id="validation3">Serial number (5 digits), battery make, and pack test result are all required.</div>
-
+                    <div class="validation-msg" id="validation3">Serial number (5 digits), battery make, and pack test are all required.</div>
                     <div class="navigation-buttons">
                         <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
                         <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
@@ -363,30 +323,25 @@ textarea { resize: vertical; min-height: 80px; }
                     <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
 
-                <!-- PAGE 4: Category + invoice + tracking -->
                 <div class="section-page" data-page="4">
                     <div class="section-title">Repair Category</div>
-
                     <div class="form-group">
                         <label>Category</label>
-                        <div class="radio-group">
-                            <div class="radio-item" data-pf="category" data-val="Warranty" onclick="selectPF(this); toggleInvoiceField()">Warranty</div>
-                            <div class="radio-item" data-pf="category" data-val="Paid" onclick="selectPF(this); toggleInvoiceField()">Paid</div>
+                        <div class="radio-group three-col">
+                            <div class="radio-item warranty" data-pf="category" data-val="WARRANTY" onclick="selectPF(this); toggleInvoiceField()">Warranty</div>
+                            <div class="radio-item paid" data-pf="category" data-val="PAID" onclick="selectPF(this); toggleInvoiceField()">Paid</div>
+                            <div class="radio-item goodwill" data-pf="category" data-val="GOODWILL" onclick="selectPF(this); toggleInvoiceField()">Goodwill</div>
                         </div>
-
                         <div class="invoice-row" id="invoiceRow">
                             <label for="invoiceNumber" style="margin-top: 18px;">Invoice Number</label>
                             <input type="text" id="invoiceNumber" placeholder="Enter invoice number">
                         </div>
                     </div>
-
                     <div class="form-group">
-                        <label for="fedexTracking">FedEx Return Tracking Number <span style="color: #999; font-weight: normal;">(optional)</span></label>
-                        <input type="text" id="fedexTracking" placeholder="Enter FedEx tracking number">
+                        <label for="fedexTracking">Return Tracking Number <span class="sub-label">(optional)</span></label>
+                        <input type="text" id="fedexTracking" placeholder="Enter return tracking number">
                     </div>
-
                     <div class="validation-msg" id="validation4">Category required. Invoice number required for Paid repairs.</div>
-
                     <div class="navigation-buttons">
                         <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
                         <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
@@ -394,37 +349,23 @@ textarea { resize: vertical; min-height: 80px; }
                     <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
 
-                <!-- PAGE 5: Items used in repair -->
                 <div class="section-page" data-page="5">
                     <div class="section-title">Items Used in Repair</div>
-
                     <div class="form-group">
-                        <label>Tick all parts/items used:</label>
+                        <label>Tick all parts used:</label>
                         <div class="checkbox-group">
-                            <div class="checkbox-item" onclick="toggleCheckbox('partBattery')"><input type="checkbox" id="partBattery"><label>Battery</label></div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('partClamps')"><input type="checkbox" id="partClamps"><label>Clamps</label></div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('partShrouds')"><input type="checkbox" id="partShrouds"><label>Shrouds</label></div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('partTestButton')"><input type="checkbox" id="partTestButton"><label>Test Button</label></div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('partDCSocket')"><input type="checkbox" id="partDCSocket"><label>DC Socket</label></div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('partCigLighter')"><input type="checkbox" id="partCigLighter"><label>Cig Lighter Socket</label></div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('part2ACharger')"><input type="checkbox" id="part2ACharger"><label>2A Charger</label></div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('part5ACharger')"><input type="checkbox" id="part5ACharger"><label>5A Charger</label></div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('partCleanJaws')"><input type="checkbox" id="partCleanJaws"><label>Clean Jaws</label></div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('partNewLabels')"><input type="checkbox" id="partNewLabels"><label>New Labels</label></div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('partPanelSocket')"><input type="checkbox" id="partPanelSocket"><label>Panel Socket</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partCircuitBoard')"><input type="checkbox" id="partCircuitBoard"><label>Circuit Board</label></div>
                             <div class="checkbox-item" onclick="toggleCheckbox('partFrontCase')"><input type="checkbox" id="partFrontCase"><label>Front Case</label></div>
                             <div class="checkbox-item" onclick="toggleCheckbox('partRearCase')"><input type="checkbox" id="partRearCase"><label>Rear Case</label></div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('partFrontCaseSecondHand')"><input type="checkbox" id="partFrontCaseSecondHand"><label>Front Case (2nd Hand)</label></div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('partRearCaseSecondHand')"><input type="checkbox" id="partRearCaseSecondHand"><label>Rear Case (2nd Hand)</label></div>
-                            <div class="checkbox-item" onclick="toggleCheckbox('partCircuitBoard')"><input type="checkbox" id="partCircuitBoard"><label>Circuit Board</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partNegSocket')"><input type="checkbox" id="partNegSocket"><label>Neg Panel Socket</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partPosSocket')"><input type="checkbox" id="partPosSocket"><label>Pos Panel Socket</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partCigLighter')"><input type="checkbox" id="partCigLighter"><label>Cig Lighter</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partDCSocket')"><input type="checkbox" id="partDCSocket"><label>DC Charge Socket</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partTestButton')"><input type="checkbox" id="partTestButton"><label>Test Button</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partM2M')"><input type="checkbox" id="partM2M"><label>M2M</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partNewPack')"><input type="checkbox" id="partNewPack"><label>New Pack</label></div>
                         </div>
                     </div>
-
-                    <div class="form-group">
-                        <label for="additionalNotes">Notes <span style="color: #999; font-weight: normal;">(optional)</span></label>
-                        <textarea id="additionalNotes" placeholder="Any additional comments about this repair"></textarea>
-                    </div>
-
                     <div class="navigation-buttons">
                         <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
                         <button type="button" class="btn btn-submit" onclick="submitForm()">Submit Repair Record</button>
@@ -438,27 +379,17 @@ textarea { resize: vertical; min-height: 80px; }
 </div>
 
 <script>
-// ============ GOOGLE SHEETS CONFIG ============
-const SHEET_ID = '1qmnTNtJm1dfYKDH3FAsaeVi8BP7jT3BhOO2UCrRPiJA';
-const SERVICE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbye-eO8huG7cSsBzycCSNc5D8yUgC7yhBUKEl7CSeEWhqtECNENI1es_3p__qOmgxlThA/exec';
-const REPAIR_HISTORY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxMY_chsqsRYDYmvcJs915aB0qKyf6wUXu5NzH_LhgOtpR_MixAVbOxay0K5XEmfpNp/exec';
+// ============ CONFIG ============
+const SHEET_ID = '1iVCdZRmTXEfbV8_tmjomq7Cs8-za80yuW8z3QwpdXBk'; // 2026 SERVICE SHEET
+const SERVICE_SCRIPT_URL = ''; // TODO: Paste Apps Script Web App URL here once deployed
 
 const MONTH_GIDS = {
-    1: null,          // JANUARY - add when available
-    2: null,          // FEBRUARY - add when available
-    3: null,          // MARCH - add when available
-    4: 21700818,      // APRIL
-    5: 257806692,     // MAY
-    6: 199519344,     // JUNE
-    7: 0,             // JULY - verify, gid=0 may indicate default sheet
-    8: 2124425478,    // AUGUST
-    9: 782015307,     // SEPTEMBER
-    10: 1786550392,   // OCTOBER
-    11: 330568521,    // NOVEMBER
-    12: 1114698946    // DECEMBER
+    1: null, 2: null, 3: null,
+    4: 21700818, 5: 257806692, 6: 199519344, 7: 0,
+    8: 2124425478, 9: 782015307, 10: 1786550392,
+    11: 330568521, 12: 1114698946
 };
 const MONTH_NAMES = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
-
 function getCurrentMonthGid() { return MONTH_GIDS[new Date().getMonth() + 1]; }
 function getCurrentMonthName() { return MONTH_NAMES[new Date().getMonth()]; }
 
@@ -470,16 +401,9 @@ let allJobs = [], currentJobs = [], expectedJobs = [], completedJobs = [];
 let activeTab = 'current';
 let serialDigitsValue = '';
 
-// ============ DATE HANDLING (page 1) ============
-function todayISO() {
-    const d = new Date();
-    return d.toISOString().split('T')[0];
-}
-function formatDateUK(iso) {
-    if (!iso) return '';
-    const [y, m, d] = iso.split('-');
-    return `${d}/${m}/${y}`;
-}
+// ============ DATE HELPERS ============
+function todayISO() { return new Date().toISOString().split('T')[0]; }
+function formatDateUK(iso) { if (!iso) return ''; const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; }
 function initReceivedDate() {
     const iso = todayISO();
     document.getElementById('receivedDate').value = iso;
@@ -488,70 +412,41 @@ function initReceivedDate() {
 function toggleDateEdit() {
     const input = document.getElementById('receivedDate');
     const display = document.getElementById('receivedDateDisplay');
-    if (input.classList.contains('hidden')) {
-        input.classList.remove('hidden');
-        display.classList.add('hidden');
-        input.focus();
-    } else {
-        input.classList.add('hidden');
-        display.classList.remove('hidden');
+    if (input.classList.contains('hidden')) { input.classList.remove('hidden'); display.classList.add('hidden'); input.focus(); }
+    else {
+        input.classList.add('hidden'); display.classList.remove('hidden');
         const iso = input.value || todayISO();
-        const isToday = iso === todayISO();
-        display.textContent = isToday ? `Today (${formatDateUK(iso)})` : formatDateUK(iso);
+        display.textContent = iso === todayISO() ? `Today (${formatDateUK(iso)})` : formatDateUK(iso);
     }
 }
 
-// ============ NUMPAD (page 3) ============
+// ============ NUMPAD ============
 function updateSerialDisplay() {
     const el = document.getElementById('serialDigits');
-    if (serialDigitsValue.length === 0) {
-        el.textContent = '_____';
-        el.classList.add('empty');
-    } else {
-        const padded = serialDigitsValue + '_'.repeat(5 - serialDigitsValue.length);
-        el.textContent = padded;
-        el.classList.remove('empty');
-    }
+    if (!serialDigitsValue.length) { el.textContent = '_____'; el.classList.add('empty'); }
+    else { el.textContent = serialDigitsValue + '_'.repeat(5 - serialDigitsValue.length); el.classList.remove('empty'); }
 }
-function numpad(d) {
-    if (serialDigitsValue.length < 5) {
-        serialDigitsValue += d;
-        updateSerialDisplay();
-    }
-}
-function numpadBack() {
-    serialDigitsValue = serialDigitsValue.slice(0, -1);
-    updateSerialDisplay();
-}
-function numpadClear() {
-    serialDigitsValue = '';
-    updateSerialDisplay();
-}
+function numpad(d) { if (serialDigitsValue.length < 5) { serialDigitsValue += d; updateSerialDisplay(); } }
+function numpadBack() { serialDigitsValue = serialDigitsValue.slice(0, -1); updateSerialDisplay(); }
+function numpadClear() { serialDigitsValue = ''; updateSerialDisplay(); }
 
-// ============ CHECKBOX/RADIO HELPERS ============
+// ============ CHECKBOX / RADIO ============
 function toggleCheckbox(id) {
     const cb = document.getElementById(id);
-    const item = cb.closest('.checkbox-item');
     cb.checked = !cb.checked;
-    item.classList.toggle('checked', cb.checked);
+    cb.closest('.checkbox-item').classList.toggle('checked', cb.checked);
 }
 function selectPF(el) {
     const group = el.dataset.pf;
     document.querySelectorAll(`[data-pf="${group}"]`).forEach(n => n.classList.remove('checked'));
     el.classList.add('checked');
-    el.dataset.selected = 'true';
 }
 function getPF(group) {
     const sel = document.querySelector(`[data-pf="${group}"].checked`);
     return sel ? sel.dataset.val : '';
 }
-function clearPFGroup(group) {
-    document.querySelectorAll(`[data-pf="${group}"]`).forEach(n => n.classList.remove('checked'));
-}
-
 function toggleInvoiceField() {
-    const cat = getPF('category');
-    document.getElementById('invoiceRow').classList.toggle('show', cat === 'Paid');
+    document.getElementById('invoiceRow').classList.toggle('show', getPF('category') === 'PAID');
 }
 
 // ============ PAGE NAV + VALIDATION ============
@@ -566,36 +461,41 @@ function showPage(n) {
     updateProgress();
     window.scrollTo(0, 0);
     document.querySelectorAll('.validation-msg').forEach(m => m.classList.remove('show'));
+    if (n === 2) {
+        const hasCharger = document.getElementById('receivedCharger').checked;
+        const hasLeads = document.getElementById('receivedLeads').checked;
+        const cardCharger = document.getElementById('cardCharger');
+        const cardLeads = document.getElementById('cardLeads');
+        cardCharger.classList.toggle('disabled', !hasCharger);
+        cardCharger.style.pointerEvents = hasCharger ? 'auto' : 'none';
+        cardLeads.classList.toggle('disabled', !hasLeads);
+        cardLeads.style.pointerEvents = hasLeads ? 'auto' : 'none';
+    }
 }
 function validatePage(n) {
-    if (n === 1) {
-        const date = document.getElementById('receivedDate').value;
-        return !!date;
-    }
+    if (n === 1) return !!document.getElementById('receivedDate').value;
     if (n === 2) {
-        return getPF('chargerTest') && getPF('leadsTest') && getPF('panelSockets') && getPF('lightsState');
+        const hasCharger = document.getElementById('receivedCharger').checked;
+        const hasLeads = document.getElementById('receivedLeads').checked;
+        if (hasCharger && (!getPF('chargerTest') || !getPF('chargerType'))) return false;
+        if (hasLeads && !getPF('leadsTest')) return false;
+        if (!getPF('panelSockets') || !getPF('lightsState')) return false;
+        return true;
     }
-    if (n === 3) {
-        return serialDigitsValue.length === 5 && getPF('batteryMake') && getPF('packTest');
-    }
+    if (n === 3) return serialDigitsValue.length === 5 && getPF('batteryMake') && getPF('packTest');
     if (n === 4) {
         const cat = getPF('category');
         if (!cat) return false;
-        if (cat === 'Paid' && !document.getElementById('invoiceNumber').value.trim()) return false;
+        if (cat === 'PAID' && !document.getElementById('invoiceNumber').value.trim()) return false;
         return true;
     }
     return true;
 }
 function nextPage() {
-    if (!validatePage(currentPage)) {
-        document.getElementById('validation' + currentPage).classList.add('show');
-        return;
-    }
+    if (!validatePage(currentPage)) { document.getElementById('validation' + currentPage).classList.add('show'); return; }
     if (currentPage < totalPages) showPage(currentPage + 1);
 }
-function previousPage() {
-    if (currentPage > 1) showPage(currentPage - 1);
-}
+function previousPage() { if (currentPage > 1) showPage(currentPage - 1); }
 
 // ============ JOB LOADING ============
 function parseCSV(text) {
@@ -612,7 +512,6 @@ function parseCSV(text) {
     if (field || row.length) { row.push(field); rows.push(row); }
     return rows;
 }
-
 function parseExpectedDate(s) {
     if (!s) return null;
     const m = s.match(/EXP\s*(\d{1,2})\/(\d{1,2})/i);
@@ -659,12 +558,13 @@ async function loadJobs() {
         document.getElementById('currentMonthDisplay').textContent = `Viewing: ${month} ${new Date().getFullYear()}`;
 
         const today = new Date(); today.setHours(0,0,0,0);
+        // Column mapping: A=0 Job, E=4 Pack Received, F=5 Customer Name, G=6 Address, N=13 Serial
         const all = rows.map((r, i) => ({
             jobNumber: r[0] || '',
-            dealerName: r[1] || '',
-            customerName: r[6] || '',
-            packReceived: r[5] || '',
-            serialNumber: r[14] || '',
+            customerName: r[5] || '',
+            customerAddress: r[6] || '',
+            packReceived: r[4] || '',
+            serialNumber: r[13] || '',
             rowIndex: i + 2
         }));
 
@@ -737,7 +637,7 @@ function displayJobs(jobs) {
         card.className = 'job-card ' + cls;
         card.innerHTML = `
             <div class="job-card-number">${job.jobNumber}</div>
-            <div class="job-card-customer">${job.customerName || job.dealerName}</div>
+            <div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div>
             <div style="font-size:14px;color:#999;margin-top:5px;">${job.packReceived ? 'Due: ' + job.packReceived : ''}</div>
             ${label ? `<div style="font-weight:700;margin-top:8px;color:#155724;background:#d4edda;padding:8px;border-radius:6px;text-align:center;">${label}</div>` : ''}
         `;
@@ -762,7 +662,7 @@ function displayExpectedJobs(jobs) {
         card.style.cursor = 'default';
         card.innerHTML = `
             <div class="job-card-number">${job.jobNumber}</div>
-            <div class="job-card-customer">${job.customerName || job.dealerName}</div>
+            <div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div>
             <div style="font-size:14px;color:#666;margin-top:5px;">Expected: ${job.packReceived}</div>
             ${label ? `<div style="font-weight:600;margin-top:8px;color:#333;">${label}</div>` : ''}
         `;
@@ -780,7 +680,7 @@ function displayCompletedJobs(jobs) {
         card.className = 'job-card repair-completed';
         card.innerHTML = `
             <div class="job-card-number">✓ ${job.jobNumber}</div>
-            <div class="job-card-customer">${job.customerName || job.dealerName}</div>
+            <div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div>
             <div style="font-size:14px;color:#999;margin-top:5px;">Serial: ${job.serialNumber}</div>
             <div style="font-size:14px;color:#28a745;margin-top:5px;font-weight:600;">COMPLETED</div>
         `;
@@ -808,15 +708,14 @@ function showAllJobs() {
     document.getElementById('searchJob').value = '';
     showJobTab(activeTab);
 }
-function showTodayJobs() {
-    showJobTab('current');
-}
+function showTodayJobs() { showJobTab('current'); }
 
 // ============ JOB SELECT / RESET ============
 function selectJob(job) {
     currentJobData = job;
     document.getElementById('currentJobNumber').textContent = job.jobNumber;
-    document.getElementById('currentCustomerName').textContent = job.customerName || job.dealerName;
+    document.getElementById('currentCustomerName').textContent = job.customerName;
+    document.getElementById('currentCustomerAddress').textContent = job.customerAddress || '';
     document.getElementById('jobSelector').classList.add('hidden');
     document.getElementById('repairForm').classList.remove('hidden');
     resetForm();
@@ -835,46 +734,45 @@ function resetForm() {
     document.getElementById('invoiceRow').classList.remove('show');
     serialDigitsValue = '';
     updateSerialDisplay();
-    // Pack always checked by default
     document.getElementById('receivedPack').checked = true;
     document.querySelector('#receivedPack').closest('.checkbox-item').classList.add('checked');
 }
 function backToJobSelector() {
     document.getElementById('repairForm').classList.add('hidden');
     document.getElementById('jobSelector').classList.remove('hidden');
-    resetForm();
-    showPage(1);
+    resetForm(); showPage(1);
 }
 
 // ============ DATA COLLECTION ============
 function collectFormData() {
-    const partIds = ['partBattery','partClamps','partShrouds','partTestButton','partDCSocket','partCigLighter','part2ACharger','part5ACharger','partCleanJaws','partNewLabels','partPanelSocket','partFrontCase','partRearCase','partFrontCaseSecondHand','partRearCaseSecondHand','partCircuitBoard'];
-    const partKeys = ['battery','clamps','shrouds','testButton','dcSocket','cigLighter','charger2A','charger5A','cleanJaws','newLabels','panelSocket','frontCase','rearCase','frontCaseSecondHand','rearCaseSecondHand','circuitBoard'];
+    const hasCharger = document.getElementById('receivedCharger').checked;
+    const hasLeads = document.getElementById('receivedLeads').checked;
+    const partIds = ['partCircuitBoard','partFrontCase','partRearCase','partNegSocket','partPosSocket','partCigLighter','partDCSocket','partTestButton','partM2M','partNewPack'];
+    const partKeys = ['circuitBoard','frontCase','rearCase','negSocket','posSocket','cigLighter','dcSocket','testButton','m2m','newPack'];
     const parts = {};
     partIds.forEach((id, i) => parts[partKeys[i]] = document.getElementById(id).checked);
 
     const cat = getPF('category');
     return {
         jobNumber: currentJobData.jobNumber,
-        customerName: currentJobData.customerName || currentJobData.dealerName,
-        receivedDate: document.getElementById('receivedDate').value,
-        receivedPack: document.getElementById('receivedPack').checked,
-        receivedLeads: document.getElementById('receivedLeads').checked,
-        receivedCharger: document.getElementById('receivedCharger').checked,
-        chargerPassFail: getPF('chargerTest'),
-        leadsPassFail: getPF('leadsTest'),
-        clampsPassFail: getPF('leadsTest'), // mirror for backward compat with old sheet column
+        receivedDate: document.getElementById('receivedDate').value,     // col E
+        popDate: document.getElementById('popDate').value,                // col L
+        serialNumber: document.getElementById('serialPrefix').value + serialDigitsValue, // col N
+        batteryMake: getPF('batteryMake'),                                // col P
+        packTest: getPF('packTest'),                                      // col V
+        chargerReceived: hasCharger,
+        chargerType: hasCharger ? getPF('chargerType') : 'NONE',          // col W
+        chargerTest: hasCharger ? getPF('chargerTest') : '',              // col X
+        leadsReceived: hasLeads,
+        clampsReceived: hasLeads ? 'BOTH' : 'NONE',                       // col Y
+        leadsTest: hasLeads ? getPF('leadsTest') : 'NONE',                // col Z
+        category: cat,                                                     // col AA + AG
+        invoiceNumber: cat === 'PAID' ? document.getElementById('invoiceNumber').value : '', // col AB
+        dateReturned: todayISO(),                                          // col AD
+        returnTracking: document.getElementById('fedexTracking').value,   // col AE
         panelSockets: getPF('panelSockets'),
         lightsState: getPF('lightsState'),
-        serialNumber: document.getElementById('serialPrefix').value + serialDigitsValue,
-        batteryMake: getPF('batteryMake'),
-        packTest: getPF('packTest'),
-        batteryPassFail: getPF('packTest'), // writes to old column W
-        category: cat,
-        invoiceNumber: cat === 'Paid' ? document.getElementById('invoiceNumber').value : '',
-        fedexTracking: document.getElementById('fedexTracking').value,
-        additionalNotes: document.getElementById('additionalNotes').value,
-        parts: parts
+        parts: parts                                                       // cols AL-AU
     };
 }
 
@@ -897,16 +795,18 @@ function loadDraft(jobNumber) {
 }
 function deleteDraft(jobNumber) { localStorage.removeItem(`draft_${jobNumber}`); }
 function restoreFormData(d, serial) {
-    if (d.receivedDate) document.getElementById('receivedDate').value = d.receivedDate;
-    document.getElementById('receivedDateDisplay').textContent = d.receivedDate === todayISO() ? `Today (${formatDateUK(d.receivedDate)})` : formatDateUK(d.receivedDate);
-    ['receivedPack','receivedLeads','receivedCharger'].forEach(id => {
-        const v = d[id];
+    if (d.receivedDate) {
+        document.getElementById('receivedDate').value = d.receivedDate;
+        document.getElementById('receivedDateDisplay').textContent = d.receivedDate === todayISO() ? `Today (${formatDateUK(d.receivedDate)})` : formatDateUK(d.receivedDate);
+    }
+    const ticks = { receivedPack: true, receivedLeads: !!d.leadsReceived, receivedCharger: !!d.chargerReceived };
+    Object.entries(ticks).forEach(([id, v]) => {
         const cb = document.getElementById(id);
-        cb.checked = !!v;
-        cb.closest('.checkbox-item').classList.toggle('checked', !!v);
+        cb.checked = v;
+        cb.closest('.checkbox-item').classList.toggle('checked', v);
     });
-    [['chargerTest', d.chargerPassFail], ['leadsTest', d.leadsPassFail], ['panelSockets', d.panelSockets], ['lightsState', d.lightsState], ['batteryMake', d.batteryMake], ['packTest', d.packTest], ['category', d.category]].forEach(([g, v]) => {
-        if (!v) return;
+    [['chargerTest', d.chargerTest], ['chargerType', d.chargerType], ['leadsTest', d.leadsTest], ['panelSockets', d.panelSockets], ['lightsState', d.lightsState], ['batteryMake', d.batteryMake], ['packTest', d.packTest], ['category', d.category]].forEach(([g, v]) => {
+        if (!v || v === 'NONE') return;
         const el = document.querySelector(`[data-pf="${g}"][data-val="${v}"]`);
         if (el) selectPF(el);
     });
@@ -916,12 +816,12 @@ function restoreFormData(d, serial) {
         serialDigitsValue = serial || d.serialNumber.substring(prefix.length);
         updateSerialDisplay();
     }
+    if (d.popDate) document.getElementById('popDate').value = d.popDate;
     if (d.invoiceNumber) document.getElementById('invoiceNumber').value = d.invoiceNumber;
-    if (d.fedexTracking) document.getElementById('fedexTracking').value = d.fedexTracking;
-    if (d.additionalNotes) document.getElementById('additionalNotes').value = d.additionalNotes;
+    if (d.returnTracking) document.getElementById('fedexTracking').value = d.returnTracking;
     toggleInvoiceField();
     if (d.parts) {
-        const map = { battery:'partBattery', clamps:'partClamps', shrouds:'partShrouds', testButton:'partTestButton', dcSocket:'partDCSocket', cigLighter:'partCigLighter', charger2A:'part2ACharger', charger5A:'part5ACharger', cleanJaws:'partCleanJaws', newLabels:'partNewLabels', panelSocket:'partPanelSocket', frontCase:'partFrontCase', rearCase:'partRearCase', frontCaseSecondHand:'partFrontCaseSecondHand', rearCaseSecondHand:'partRearCaseSecondHand', circuitBoard:'partCircuitBoard' };
+        const map = { circuitBoard:'partCircuitBoard', frontCase:'partFrontCase', rearCase:'partRearCase', negSocket:'partNegSocket', posSocket:'partPosSocket', cigLighter:'partCigLighter', dcSocket:'partDCSocket', testButton:'partTestButton', m2m:'partM2M', newPack:'partNewPack' };
         Object.entries(d.parts).forEach(([k, v]) => {
             const id = map[k]; if (!id) return;
             const cb = document.getElementById(id);
@@ -933,14 +833,16 @@ function restoreFormData(d, serial) {
 
 // ============ SUBMIT ============
 function submitForm() {
+    if (!SERVICE_SCRIPT_URL) {
+        alert('⚠️ Apps Script URL not configured yet.\n\nEdit index.html and set SERVICE_SCRIPT_URL.');
+        return;
+    }
     const data = collectFormData();
     const btn = document.querySelector('.btn-submit');
     const orig = btn.textContent;
     btn.textContent = 'Saving...'; btn.disabled = true;
-    const opts = { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(data) };
-    const p1 = fetch(SERVICE_SCRIPT_URL, opts);
-    const p2 = REPAIR_HISTORY_SCRIPT_URL ? fetch(REPAIR_HISTORY_SCRIPT_URL, opts) : Promise.resolve();
-    Promise.all([p1, p2]).then(() => {
+    fetch(SERVICE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(data) })
+    .then(() => {
         document.getElementById('successMessage').classList.remove('hidden');
         document.getElementById('errorMessage').classList.add('hidden');
         deleteDraft(data.jobNumber);
