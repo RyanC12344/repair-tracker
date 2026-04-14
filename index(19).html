@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portable Power - Service Repair Tracker</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; min-height: 100vh; padding: 20px; }
+.container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); overflow: hidden; }
+.header { background: linear-gradient(135deg, #1a2332 0%, #2d3e50 100%); color: white; padding: 25px 30px; text-align: center; border-bottom: 4px solid #c41e3a; }
+.header .brand { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.9; margin-bottom: 5px; font-weight: 600; }
+.header h1 { font-size: 28px; margin: 0; font-weight: 700; }
+.header p { margin-top: 5px; font-size: 13px; opacity: 0.85; }
+
+.job-info { background: #1a2332; padding: 20px; border-bottom: 3px solid #c41e3a; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; color: white; gap: 15px; }
+.back-to-jobs-btn { background: #c41e3a; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; white-space: nowrap; }
+.back-to-jobs-btn:hover { background: #a01729; transform: translateX(-3px); }
+.job-info-item { font-size: 18px; font-weight: 600; }
+.job-info-label { color: #aaa; font-size: 12px; font-weight: normal; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.form-section { padding: 30px; }
+.section-page { display: none; animation: fadeIn 0.3s; }
+.section-page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.section-title { font-size: 24px; font-weight: 700; color: #1a2332; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #e0e0e0; }
+
+.progress-bar { background: #e0e0e0; height: 12px; border-radius: 10px; margin-bottom: 20px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
+.progress-fill { background: linear-gradient(90deg, #c41e3a 0%, #a01729 100%); height: 100%; transition: width 0.4s ease; box-shadow: 0 0 10px rgba(196, 30, 58, 0.5); }
+.progress-text { text-align: center; color: #1a2332; font-size: 14px; margin-bottom: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.form-group { margin-bottom: 25px; }
+label { display: block; font-weight: 600; margin-bottom: 8px; color: #333; font-size: 16px; }
+input[type="text"], input[type="number"], input[type="date"], textarea, select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; font-family: inherit; }
+input:focus, textarea:focus, select:focus { outline: none; border-color: #c41e3a; }
+textarea { resize: vertical; min-height: 80px; }
+
+/* Subtle date row on page 1 */
+.date-row { display: flex; align-items: center; gap: 10px; background: #f8f9fa; padding: 10px 14px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e0e0e0; font-size: 14px; }
+.date-row .date-label { color: #666; }
+.date-row .date-value { font-weight: 600; color: #1a2332; flex: 1; }
+.date-row input[type="date"] { width: auto; padding: 6px 8px; font-size: 14px; }
+.edit-date-btn { background: none; border: none; color: #c41e3a; font-size: 13px; cursor: pointer; text-decoration: underline; padding: 4px 8px; }
+
+.checkbox-group { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 10px; }
+.checkbox-item { display: flex; align-items: center; background: #f8f9fa; padding: 14px 16px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; user-select: none; }
+.checkbox-item:hover { background: #e9ecef; }
+.checkbox-item input[type="checkbox"] { width: 22px; height: 22px; margin-right: 10px; cursor: pointer; flex-shrink: 0; pointer-events: none; }
+.checkbox-item.checked { background: #d4edda; border-color: #28a745; }
+.checkbox-item label { margin: 0; cursor: pointer; font-weight: 500; pointer-events: none; }
+
+.radio-group { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px; }
+.radio-group.three-col { grid-template-columns: repeat(3, 1fr); }
+.radio-item { display: flex; align-items: center; justify-content: center; background: #f8f9fa; padding: 16px 20px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; font-weight: 600; font-size: 16px; user-select: none; }
+.radio-item:hover { background: #e9ecef; }
+.radio-item input[type="radio"] { display: none; }
+.radio-item.checked { background: #d4edda; border-color: #28a745; color: #155724; }
+.radio-item.fail.checked { background: #f8d7da; border-color: #dc3545; color: #721c24; }
+.radio-item.neutral.checked { background: #d1ecf1; border-color: #17a2b8; color: #0c5460; }
+
+/* Pass/Fail card row used on page 2 */
+.pf-row { display: grid; grid-template-columns: 1fr; gap: 18px; }
+.pf-card { background: #fff; border: 2px solid #e0e0e0; border-radius: 10px; padding: 16px; }
+.pf-card .pf-title { font-size: 17px; font-weight: 700; color: #1a2332; margin-bottom: 12px; }
+
+/* Serial number block */
+.serial-block { background: #f8f9fa; border-radius: 10px; padding: 18px; border: 2px solid #e0e0e0; }
+.serial-display { display: flex; gap: 10px; align-items: stretch; margin-bottom: 16px; }
+.serial-prefix-select { flex: 0 0 110px; }
+.serial-prefix-select select { height: 100%; padding: 14px 8px; font-size: 18px; font-weight: 700; }
+.serial-digits { flex: 1; background: white; border: 2px solid #ddd; border-radius: 8px; padding: 14px; font-size: 28px; font-weight: 700; text-align: center; letter-spacing: 6px; color: #1a2332; min-height: 60px; display: flex; align-items: center; justify-content: center; font-family: 'Courier New', monospace; }
+.serial-digits.empty { color: #ccc; }
+
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.numpad button { padding: 22px; font-size: 26px; font-weight: 700; background: white; border: 2px solid #ddd; border-radius: 10px; cursor: pointer; transition: all 0.15s; color: #1a2332; }
+.numpad button:hover { background: #e9ecef; border-color: #c41e3a; }
+.numpad button:active { transform: scale(0.96); background: #c41e3a; color: white; }
+.numpad button.action { background: #1a2332; color: white; font-size: 16px; }
+.numpad button.action:hover { background: #c41e3a; }
+.numpad button.clear { background: #6c757d; color: white; font-size: 16px; }
+
+.navigation-buttons { display: flex; gap: 15px; margin-top: 30px; }
+.btn { flex: 1; padding: 18px; border: none; border-radius: 8px; font-size: 18px; font-weight: 700; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+.btn:hover { transform: translateY(-2px); }
+.btn:active { transform: translateY(0); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-previous { background: #6c757d; color: white; }
+.btn-next { background: #c41e3a; color: white; }
+.btn-next:hover { background: #a01729; box-shadow: 0 10px 30px rgba(196, 30, 58, 0.4); }
+.btn-submit { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; }
+.btn-submit:hover { box-shadow: 0 10px 30px rgba(40, 167, 69, 0.4); }
+.btn-save-draft { background: #ffc107; color: #1a2332; font-weight: 700; margin-top: 20px; width: 100%; }
+.btn-save-draft:hover { background: #e0a800; box-shadow: 0 4px 12px rgba(255, 193, 7, 0.4); }
+
+.validation-msg { background: #fff3cd; border: 2px solid #ffc107; color: #856404; padding: 12px 16px; border-radius: 8px; margin-top: 15px; font-weight: 600; display: none; }
+.validation-msg.show { display: block; animation: fadeIn 0.3s; }
+
+.job-selector { padding: 30px; }
+.job-list { display: grid; gap: 15px; margin-top: 20px; }
+.job-card { background: #f8f9fa; padding: 20px; border-radius: 8px; border: 2px solid #ddd; cursor: pointer; transition: all 0.3s; text-align: left; }
+.job-card:hover { border-color: #c41e3a; background: #fff5f5; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+.job-card-number { font-size: 20px; font-weight: 700; color: #1a2332; margin-bottom: 5px; }
+.job-card-customer { font-size: 16px; color: #666; }
+
+.hidden { display: none !important; }
+.success-message { background: #d4edda; color: #155724; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #c3e6cb; text-align: center; font-weight: 600; }
+.error-message { background: #f8d7da; color: #721c24; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #f5c6cb; text-align: center; font-weight: 600; }
+.loading { text-align: center; padding: 40px; font-size: 18px; color: #666; }
+
+.job-tab.active { border-bottom-color: #c41e3a !important; color: #c41e3a !important; }
+.job-tab:hover { background: #f8f9fa; }
+.expected-today { border: 3px solid #28a745 !important; background: #d4edda !important; }
+.expected-tomorrow { border: 3px solid #ffc107 !important; background: #fff3cd !important; }
+.expected-soon { border: 3px solid #17a2b8 !important; background: #d1ecf1 !important; }
+.repair-today { border: 3px solid #28a745 !important; background: #d4edda !important; }
+.repair-completed { opacity: 0.75; background: #f8f9fa !important; }
+.repair-completed .job-card-number { color: #28a745; }
+
+.stats-dashboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
+.stat-card { background: white; border: 2px solid #e0e0e0; border-radius: 12px; padding: 20px; text-align: center; transition: all 0.3s; }
+.stat-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+.stat-today { border-color: #c41e3a; background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%); }
+.stat-current { border-color: #1a2332; background: linear-gradient(135deg, #f0f3f5 0%, #ffffff 100%); }
+.stat-completed { border-color: #28a745; background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%); }
+.stat-number { font-size: 36px; font-weight: 700; margin-bottom: 8px; }
+.stat-today .stat-number { color: #c41e3a; }
+.stat-current .stat-number { color: #1a2332; }
+.stat-completed .stat-number { color: #28a745; }
+.stat-label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #666; font-weight: 600; }
+
+.invoice-row { margin-top: 15px; display: none; }
+.invoice-row.show { display: block; animation: fadeIn 0.3s; }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div class="brand">PORTABLE POWER</div>
+        <h1>Service Repair Tracker</h1>
+        <p>Streamlined Repair Documentation</p>
+    </div>
+
+    <!-- Job Selection Screen -->
+    <div id="jobSelector" class="job-selector">
+        <h2 class="section-title">Select a Job to Begin Repair</h2>
+        <div style="text-align: center; color: #1a2332; font-weight: 600; margin-bottom: 20px; font-size: 16px;" id="currentMonthDisplay"></div>
+
+        <div class="stats-dashboard">
+            <div class="stat-card stat-today">
+                <div class="stat-number" id="statToday">0</div>
+                <div class="stat-label">Due Today</div>
+            </div>
+            <div class="stat-card stat-current">
+                <div class="stat-number" id="statCurrent">0</div>
+                <div class="stat-label">Current Repairs</div>
+            </div>
+            <div class="stat-card stat-completed">
+                <div class="stat-number" id="statCompleted">0</div>
+                <div class="stat-label">Completed This Month</div>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e0e0e0;">
+            <button id="tabCurrent" class="job-tab active" onclick="showJobTab('current')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid #c41e3a; color: #c41e3a;">
+                Current (<span id="currentCount">0</span>)
+            </button>
+            <button id="tabExpected" class="job-tab" onclick="showJobTab('expected')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; color: #999;">
+                Expected (<span id="expectedCount">0</span>)
+            </button>
+            <button id="tabCompleted" class="job-tab" onclick="showJobTab('completed')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; color: #999;">
+                Completed (<span id="completedCount">0</span>)
+            </button>
+        </div>
+
+        <div style="margin-bottom: 25px;">
+            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                <div style="flex: 1;">
+                    <label for="dateFilter" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Filter by Date:</label>
+                    <input type="date" id="dateFilter" onchange="filterJobs()">
+                </div>
+                <div style="flex: 1;">
+                    <label for="searchJob" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Search Job Number:</label>
+                    <input type="text" id="searchJob" placeholder="e.g., R1101" oninput="filterJobs()">
+                </div>
+            </div>
+            <button onclick="showAllJobs()" style="padding: 10px 20px; background: #1a2332; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Show All</button>
+            <button onclick="showTodayJobs()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; margin-left: 10px;">Today's Jobs</button>
+        </div>
+
+        <div class="loading" id="loadingJobs">Loading jobs...</div>
+        <div id="jobCount" style="text-align: center; color: #666; margin-bottom: 15px; font-weight: 600;"></div>
+        <div class="job-list" id="jobList"></div>
+    </div>
+
+    <!-- Repair Form Screen -->
+    <div id="repairForm" class="hidden">
+        <div class="job-info">
+            <button class="back-to-jobs-btn" onclick="backToJobSelector()">
+                <span style="font-size: 18px;">←</span> Back
+            </button>
+            <div class="job-info-item">
+                <span class="job-info-label">Job Number</span>
+                <span id="currentJobNumber">-</span>
+            </div>
+            <div class="job-info-item">
+                <span class="job-info-label">Customer</span>
+                <span id="currentCustomerName">-</span>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div id="successMessage" class="success-message hidden">✓ Repair record saved successfully!</div>
+            <div id="errorMessage" class="error-message hidden"></div>
+
+            <div class="progress-text"><span id="progressText">Step 1 of 5</span></div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 20%"></div>
+            </div>
+
+            <form id="mainForm">
+
+                <!-- PAGE 1: Package received date + Items received -->
+                <div class="section-page active" data-page="1">
+                    <div class="section-title">Package Received</div>
+
+                    <div class="date-row">
+                        <span class="date-label">Received:</span>
+                        <span class="date-value" id="receivedDateDisplay">Today</span>
+                        <input type="date" id="receivedDate" class="hidden">
+                        <button type="button" class="edit-date-btn" onclick="toggleDateEdit()">edit</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Items received</label>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item checked" onclick="toggleCheckbox('receivedPack')">
+                                <input type="checkbox" id="receivedPack" checked>
+                                <label>Pack</label>
+                            </div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('receivedLeads')">
+                                <input type="checkbox" id="receivedLeads">
+                                <label>Leads</label>
+                            </div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('receivedCharger')">
+                                <input type="checkbox" id="receivedCharger">
+                                <label>Charger</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="validation-msg" id="validation1">Please confirm the received date and items.</div>
+
+                    <div class="navigation-buttons">
+                        <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
+                    </div>
+                    <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
+                </div>
+
+                <!-- PAGE 2: Pass/Fail tests -->
+                <div class="section-page" data-page="2">
+                    <div class="section-title">Initial Tests</div>
+
+                    <div class="pf-row">
+                        <div class="pf-card">
+                            <div class="pf-title">Charger</div>
+                            <div class="radio-group">
+                                <div class="radio-item" data-pf="chargerTest" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
+                                <div class="radio-item fail" data-pf="chargerTest" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
+                            </div>
+                        </div>
+
+                        <div class="pf-card">
+                            <div class="pf-title">Leads</div>
+                            <div class="radio-group">
+                                <div class="radio-item" data-pf="leadsTest" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
+                                <div class="radio-item fail" data-pf="leadsTest" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
+                            </div>
+                        </div>
+
+                        <div class="pf-card">
+                            <div class="pf-title">Panel Sockets</div>
+                            <div class="radio-group">
+                                <div class="radio-item" data-pf="panelSockets" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
+                                <div class="radio-item fail" data-pf="panelSockets" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
+                            </div>
+                        </div>
+
+                        <div class="pf-card">
+                            <div class="pf-title">Lights on Pack</div>
+                            <div class="radio-group">
+                                <div class="radio-item" data-pf="lightsState" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
+                                <div class="radio-item fail" data-pf="lightsState" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="validation-msg" id="validation2">All four tests must be marked Pass or Fail before continuing.</div>
+
+                    <div class="navigation-buttons">
+                        <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
+                        <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
+                    </div>
+                    <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
+                </div>
+
+                <!-- PAGE 3: Serial number, Battery make, Pack test -->
+                <div class="section-page" data-page="3">
+                    <div class="section-title">Pack Inspection</div>
+
+                    <div class="form-group">
+                        <label>Serial Number</label>
+                        <div class="serial-block">
+                            <div class="serial-display">
+                                <div class="serial-prefix-select">
+                                    <select id="serialPrefix">
+                                        <option value="NA">NA</option>
+                                        <option value="DZ1H">DZ1H</option>
+                                    </select>
+                                </div>
+                                <div class="serial-digits empty" id="serialDigits">_____</div>
+                            </div>
+                            <div class="numpad">
+                                <button type="button" onclick="numpad('1')">1</button>
+                                <button type="button" onclick="numpad('2')">2</button>
+                                <button type="button" onclick="numpad('3')">3</button>
+                                <button type="button" onclick="numpad('4')">4</button>
+                                <button type="button" onclick="numpad('5')">5</button>
+                                <button type="button" onclick="numpad('6')">6</button>
+                                <button type="button" onclick="numpad('7')">7</button>
+                                <button type="button" onclick="numpad('8')">8</button>
+                                <button type="button" onclick="numpad('9')">9</button>
+                                <button type="button" class="clear" onclick="numpadClear()">Clear</button>
+                                <button type="button" onclick="numpad('0')">0</button>
+                                <button type="button" class="action" onclick="numpadBack()">⌫</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Battery Make</label>
+                        <div class="radio-group three-col">
+                            <div class="radio-item" data-pf="batteryMake" data-val="BB22" onclick="selectPF(this)">BB22</div>
+                            <div class="radio-item" data-pf="batteryMake" data-val="BB24" onclick="selectPF(this)">BB24</div>
+                            <div class="radio-item neutral" data-pf="batteryMake" data-val="Not Ours" onclick="selectPF(this)">Not Ours</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Pack Test</label>
+                        <div class="radio-group">
+                            <div class="radio-item" data-pf="packTest" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
+                            <div class="radio-item fail" data-pf="packTest" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
+                        </div>
+                    </div>
+
+                    <div class="validation-msg" id="validation3">Serial number (5 digits), battery make, and pack test result are all required.</div>
+
+                    <div class="navigation-buttons">
+                        <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
+                        <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
+                    </div>
+                    <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
+                </div>
+
+                <!-- PAGE 4: Category + invoice + tracking -->
+                <div class="section-page" data-page="4">
+                    <div class="section-title">Repair Category</div>
+
+                    <div class="form-group">
+                        <label>Category</label>
+                        <div class="radio-group">
+                            <div class="radio-item" data-pf="category" data-val="Warranty" onclick="selectPF(this); toggleInvoiceField()">Warranty</div>
+                            <div class="radio-item" data-pf="category" data-val="Paid" onclick="selectPF(this); toggleInvoiceField()">Paid</div>
+                        </div>
+
+                        <div class="invoice-row" id="invoiceRow">
+                            <label for="invoiceNumber" style="margin-top: 18px;">Invoice Number</label>
+                            <input type="text" id="invoiceNumber" placeholder="Enter invoice number">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="fedexTracking">FedEx Return Tracking Number <span style="color: #999; font-weight: normal;">(optional)</span></label>
+                        <input type="text" id="fedexTracking" placeholder="Enter FedEx tracking number">
+                    </div>
+
+                    <div class="validation-msg" id="validation4">Category required. Invoice number required for Paid repairs.</div>
+
+                    <div class="navigation-buttons">
+                        <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
+                        <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
+                    </div>
+                    <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
+                </div>
+
+                <!-- PAGE 5: Items used in repair -->
+                <div class="section-page" data-page="5">
+                    <div class="section-title">Items Used in Repair</div>
+
+                    <div class="form-group">
+                        <label>Tick all parts/items used:</label>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item" onclick="toggleCheckbox('partBattery')"><input type="checkbox" id="partBattery"><label>Battery</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partClamps')"><input type="checkbox" id="partClamps"><label>Clamps</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partShrouds')"><input type="checkbox" id="partShrouds"><label>Shrouds</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partTestButton')"><input type="checkbox" id="partTestButton"><label>Test Button</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partDCSocket')"><input type="checkbox" id="partDCSocket"><label>DC Socket</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partCigLighter')"><input type="checkbox" id="partCigLighter"><label>Cig Lighter Socket</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('part2ACharger')"><input type="checkbox" id="part2ACharger"><label>2A Charger</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('part5ACharger')"><input type="checkbox" id="part5ACharger"><label>5A Charger</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partCleanJaws')"><input type="checkbox" id="partCleanJaws"><label>Clean Jaws</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partNewLabels')"><input type="checkbox" id="partNewLabels"><label>New Labels</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partPanelSocket')"><input type="checkbox" id="partPanelSocket"><label>Panel Socket</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partFrontCase')"><input type="checkbox" id="partFrontCase"><label>Front Case</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partRearCase')"><input type="checkbox" id="partRearCase"><label>Rear Case</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partFrontCaseSecondHand')"><input type="checkbox" id="partFrontCaseSecondHand"><label>Front Case (2nd Hand)</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partRearCaseSecondHand')"><input type="checkbox" id="partRearCaseSecondHand"><label>Rear Case (2nd Hand)</label></div>
+                            <div class="checkbox-item" onclick="toggleCheckbox('partCircuitBoard')"><input type="checkbox" id="partCircuitBoard"><label>Circuit Board</label></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="additionalNotes">Notes <span style="color: #999; font-weight: normal;">(optional)</span></label>
+                        <textarea id="additionalNotes" placeholder="Any additional comments about this repair"></textarea>
+                    </div>
+
+                    <div class="navigation-buttons">
+                        <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
+                        <button type="button" class="btn btn-submit" onclick="submitForm()">Submit Repair Record</button>
+                    </div>
+                    <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============ GOOGLE SHEETS CONFIG ============
+const SHEET_ID = '1qmnTNtJm1dfYKDH3FAsaeVi8BP7jT3BhOO2UCrRPiJA';
+const SERVICE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbye-eO8huG7cSsBzycCSNc5D8yUgC7yhBUKEl7CSeEWhqtECNENI1es_3p__qOmgxlThA/exec';
+const REPAIR_HISTORY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxMY_chsqsRYDYmvcJs915aB0qKyf6wUXu5NzH_LhgOtpR_MixAVbOxay0K5XEmfpNp/exec';
+
+const MONTH_GIDS = {
+    1: null, 2: null, 3: null, 4: null, 5: null, 6: null,
+    7: null, 8: null, 9: null, 10: null,
+    11: 330568521,
+    12: 1114698946
+};
+const MONTH_NAMES = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+
+function getCurrentMonthGid() { return MONTH_GIDS[new Date().getMonth() + 1]; }
+function getCurrentMonthName() { return MONTH_NAMES[new Date().getMonth()]; }
+
+// ============ STATE ============
+let currentJobData = null;
+let currentPage = 1;
+const totalPages = 5;
+let allJobs = [], currentJobs = [], expectedJobs = [], completedJobs = [];
+let activeTab = 'current';
+let serialDigitsValue = '';
+
+// ============ DATE HANDLING (page 1) ============
+function todayISO() {
+    const d = new Date();
+    return d.toISOString().split('T')[0];
+}
+function formatDateUK(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+}
+function initReceivedDate() {
+    const iso = todayISO();
+    document.getElementById('receivedDate').value = iso;
+    document.getElementById('receivedDateDisplay').textContent = `Today (${formatDateUK(iso)})`;
+}
+function toggleDateEdit() {
+    const input = document.getElementById('receivedDate');
+    const display = document.getElementById('receivedDateDisplay');
+    if (input.classList.contains('hidden')) {
+        input.classList.remove('hidden');
+        display.classList.add('hidden');
+        input.focus();
+    } else {
+        input.classList.add('hidden');
+        display.classList.remove('hidden');
+        const iso = input.value || todayISO();
+        const isToday = iso === todayISO();
+        display.textContent = isToday ? `Today (${formatDateUK(iso)})` : formatDateUK(iso);
+    }
+}
+
+// ============ NUMPAD (page 3) ============
+function updateSerialDisplay() {
+    const el = document.getElementById('serialDigits');
+    if (serialDigitsValue.length === 0) {
+        el.textContent = '_____';
+        el.classList.add('empty');
+    } else {
+        const padded = serialDigitsValue + '_'.repeat(5 - serialDigitsValue.length);
+        el.textContent = padded;
+        el.classList.remove('empty');
+    }
+}
+function numpad(d) {
+    if (serialDigitsValue.length < 5) {
+        serialDigitsValue += d;
+        updateSerialDisplay();
+    }
+}
+function numpadBack() {
+    serialDigitsValue = serialDigitsValue.slice(0, -1);
+    updateSerialDisplay();
+}
+function numpadClear() {
+    serialDigitsValue = '';
+    updateSerialDisplay();
+}
+
+// ============ CHECKBOX/RADIO HELPERS ============
+function toggleCheckbox(id) {
+    const cb = document.getElementById(id);
+    const item = cb.closest('.checkbox-item');
+    cb.checked = !cb.checked;
+    item.classList.toggle('checked', cb.checked);
+}
+function selectPF(el) {
+    const group = el.dataset.pf;
+    document.querySelectorAll(`[data-pf="${group}"]`).forEach(n => n.classList.remove('checked'));
+    el.classList.add('checked');
+    el.dataset.selected = 'true';
+}
+function getPF(group) {
+    const sel = document.querySelector(`[data-pf="${group}"].checked`);
+    return sel ? sel.dataset.val : '';
+}
+function clearPFGroup(group) {
+    document.querySelectorAll(`[data-pf="${group}"]`).forEach(n => n.classList.remove('checked'));
+}
+
+function toggleInvoiceField() {
+    const cat = getPF('category');
+    document.getElementById('invoiceRow').classList.toggle('show', cat === 'Paid');
+}
+
+// ============ PAGE NAV + VALIDATION ============
+function updateProgress() {
+    document.getElementById('progressFill').style.width = (currentPage / totalPages * 100) + '%';
+    document.getElementById('progressText').textContent = `Step ${currentPage} of ${totalPages}`;
+}
+function showPage(n) {
+    document.querySelectorAll('.section-page').forEach(p => p.classList.remove('active'));
+    document.querySelector(`.section-page[data-page="${n}"]`).classList.add('active');
+    currentPage = n;
+    updateProgress();
+    window.scrollTo(0, 0);
+    document.querySelectorAll('.validation-msg').forEach(m => m.classList.remove('show'));
+}
+function validatePage(n) {
+    if (n === 1) {
+        const date = document.getElementById('receivedDate').value;
+        return !!date;
+    }
+    if (n === 2) {
+        return getPF('chargerTest') && getPF('leadsTest') && getPF('panelSockets') && getPF('lightsState');
+    }
+    if (n === 3) {
+        return serialDigitsValue.length === 5 && getPF('batteryMake') && getPF('packTest');
+    }
+    if (n === 4) {
+        const cat = getPF('category');
+        if (!cat) return false;
+        if (cat === 'Paid' && !document.getElementById('invoiceNumber').value.trim()) return false;
+        return true;
+    }
+    return true;
+}
+function nextPage() {
+    if (!validatePage(currentPage)) {
+        document.getElementById('validation' + currentPage).classList.add('show');
+        return;
+    }
+    if (currentPage < totalPages) showPage(currentPage + 1);
+}
+function previousPage() {
+    if (currentPage > 1) showPage(currentPage - 1);
+}
+
+// ============ JOB LOADING ============
+function parseCSV(text) {
+    const rows = []; let row = []; let field = ''; let q = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i], n = text[i + 1];
+        if (c === '"') { if (q && n === '"') { field += '"'; i++; } else q = !q; }
+        else if (c === ',' && !q) { row.push(field); field = ''; }
+        else if ((c === '\n' || c === '\r') && !q) {
+            if (c === '\r' && n === '\n') i++;
+            if (field || row.length) { row.push(field); rows.push(row); row = []; field = ''; }
+        } else field += c;
+    }
+    if (field || row.length) { row.push(field); rows.push(row); }
+    return rows;
+}
+
+function parseExpectedDate(s) {
+    if (!s) return null;
+    const m = s.match(/EXP\s*(\d{1,2})\/(\d{1,2})/i);
+    if (!m) return null;
+    return new Date(new Date().getFullYear(), parseInt(m[2]) - 1, parseInt(m[1]));
+}
+function parseDateFromSheet(s) {
+    if (!s) return null;
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return d;
+    const p = s.split('/');
+    if (p.length === 3) {
+        const dd = parseInt(p[0]), mm = parseInt(p[1]) - 1, yy = parseInt(p[2]);
+        if (!isNaN(dd) && !isNaN(mm) && !isNaN(yy)) return new Date(yy, mm, dd);
+    }
+    return null;
+}
+function getDateCategory(d) {
+    if (!d) return 'future';
+    const today = new Date(); today.setHours(0,0,0,0);
+    const tom = new Date(today); tom.setDate(tom.getDate() + 1);
+    const wk = new Date(today); wk.setDate(wk.getDate() + 7);
+    const ed = new Date(d); ed.setHours(0,0,0,0);
+    if (ed.getTime() === today.getTime()) return 'today';
+    if (ed.getTime() === tom.getTime()) return 'tomorrow';
+    if (ed <= wk) return 'soon';
+    return 'future';
+}
+
+async function loadJobs() {
+    try {
+        const gid = getCurrentMonthGid();
+        const month = getCurrentMonthName();
+        if (gid === null) {
+            document.getElementById('loadingJobs').innerHTML = `<div class="error-message">No GID configured for ${month}.</div>`;
+            return;
+        }
+        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
+        const res = await fetch(url);
+        const text = await res.text();
+        const rows = parseCSV(text).slice(1);
+
+        document.getElementById('loadingJobs').classList.add('hidden');
+        document.getElementById('currentMonthDisplay').textContent = `Viewing: ${month} ${new Date().getFullYear()}`;
+
+        const today = new Date(); today.setHours(0,0,0,0);
+        const all = rows.map((r, i) => ({
+            jobNumber: r[0] || '',
+            dealerName: r[1] || '',
+            customerName: r[6] || '',
+            packReceived: r[5] || '',
+            serialNumber: r[14] || '',
+            rowIndex: i + 2
+        }));
+
+        const exp = [], arr = [], comp = [];
+        all.forEach(row => {
+            if (!row.packReceived) return;
+            const hasSerial = row.serialNumber && row.serialNumber.trim() !== '';
+            if (String(row.packReceived).toUpperCase().startsWith('EXP')) {
+                const ed = parseExpectedDate(row.packReceived);
+                if (ed && ed <= today) {
+                    if (hasSerial) comp.push({ ...row, type: 'completed' });
+                    else arr.push({ ...row, receivedDate: ed, type: 'current' });
+                } else exp.push({ ...row, expectedDate: ed, type: 'expected' });
+            } else {
+                if (hasSerial) comp.push({ ...row, type: 'completed' });
+                else arr.push({ ...row, receivedDate: parseDateFromSheet(row.packReceived), type: 'current' });
+            }
+        });
+
+        expectedJobs = exp.sort((a, b) => (a.expectedDate && b.expectedDate) ? a.expectedDate - b.expectedDate : 0);
+        currentJobs = arr.sort((a, b) => a.jobNumber.localeCompare(b.jobNumber));
+        completedJobs = comp.sort((a, b) => b.jobNumber.localeCompare(a.jobNumber));
+        allJobs = [...currentJobs, ...expectedJobs, ...completedJobs];
+
+        document.getElementById('currentCount').textContent = currentJobs.length;
+        document.getElementById('expectedCount').textContent = expectedJobs.length;
+        document.getElementById('completedCount').textContent = completedJobs.length;
+
+        const due = currentJobs.filter(j => {
+            if (!j.receivedDate) return false;
+            const rd = new Date(j.receivedDate); rd.setHours(0,0,0,0);
+            return rd.getTime() === today.getTime();
+        }).length;
+        document.getElementById('statToday').textContent = due;
+        document.getElementById('statCurrent').textContent = currentJobs.length;
+        document.getElementById('statCompleted').textContent = completedJobs.length;
+
+        showTodayJobs();
+    } catch (err) {
+        console.error(err);
+        document.getElementById('loadingJobs').innerHTML = '<div class="error-message">Error loading jobs. Refresh the page.</div>';
+    }
+}
+
+function showJobTab(tab) {
+    activeTab = tab;
+    document.getElementById('tabCurrent').classList.toggle('active', tab === 'current');
+    document.getElementById('tabExpected').classList.toggle('active', tab === 'expected');
+    document.getElementById('tabCompleted').classList.toggle('active', tab === 'completed');
+    document.getElementById('dateFilter').value = '';
+    document.getElementById('searchJob').value = '';
+    if (tab === 'current') displayJobs(currentJobs);
+    else if (tab === 'expected') displayExpectedJobs(expectedJobs);
+    else displayCompletedJobs(completedJobs);
+}
+function displayJobs(jobs) {
+    const list = document.getElementById('jobList');
+    const count = document.getElementById('jobCount');
+    list.innerHTML = '';
+    if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No jobs found.</p>'; count.textContent=''; return; }
+    count.textContent = `Showing ${jobs.length} job${jobs.length !== 1 ? 's' : ''}`;
+    const today = new Date(); today.setHours(0,0,0,0);
+    jobs.forEach(job => {
+        let cls = '', label = '';
+        if (job.receivedDate) {
+            const rd = new Date(job.receivedDate); rd.setHours(0,0,0,0);
+            if (rd.getTime() === today.getTime()) { cls = 'repair-today'; label = '📦 DUE TODAY'; }
+        }
+        const card = document.createElement('div');
+        card.className = 'job-card ' + cls;
+        card.innerHTML = `
+            <div class="job-card-number">${job.jobNumber}</div>
+            <div class="job-card-customer">${job.customerName || job.dealerName}</div>
+            <div style="font-size:14px;color:#999;margin-top:5px;">${job.packReceived ? 'Due: ' + job.packReceived : ''}</div>
+            ${label ? `<div style="font-weight:700;margin-top:8px;color:#155724;background:#d4edda;padding:8px;border-radius:6px;text-align:center;">${label}</div>` : ''}
+        `;
+        card.onclick = () => selectJob(job);
+        list.appendChild(card);
+    });
+}
+function displayExpectedJobs(jobs) {
+    const list = document.getElementById('jobList');
+    const count = document.getElementById('jobCount');
+    list.innerHTML = '';
+    if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No expected arrivals.</p>'; count.textContent=''; return; }
+    count.textContent = `Showing ${jobs.length} expected arrival${jobs.length !== 1 ? 's' : ''}`;
+    jobs.forEach(job => {
+        const cat = getDateCategory(job.expectedDate);
+        let cls = '', label = '';
+        if (cat === 'today') { cls = 'expected-today'; label = '📦 Arriving TODAY'; }
+        else if (cat === 'tomorrow') { cls = 'expected-tomorrow'; label = '📅 Arriving TOMORROW'; }
+        else if (cat === 'soon') { cls = 'expected-soon'; label = '🔜 Arriving This Week'; }
+        const card = document.createElement('div');
+        card.className = 'job-card ' + cls;
+        card.style.cursor = 'default';
+        card.innerHTML = `
+            <div class="job-card-number">${job.jobNumber}</div>
+            <div class="job-card-customer">${job.customerName || job.dealerName}</div>
+            <div style="font-size:14px;color:#666;margin-top:5px;">Expected: ${job.packReceived}</div>
+            ${label ? `<div style="font-weight:600;margin-top:8px;color:#333;">${label}</div>` : ''}
+        `;
+        list.appendChild(card);
+    });
+}
+function displayCompletedJobs(jobs) {
+    const list = document.getElementById('jobList');
+    const count = document.getElementById('jobCount');
+    list.innerHTML = '';
+    if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No completed repairs yet.</p>'; count.textContent=''; return; }
+    count.textContent = `Showing ${jobs.length} completed repair${jobs.length !== 1 ? 's' : ''}`;
+    jobs.forEach(job => {
+        const card = document.createElement('div');
+        card.className = 'job-card repair-completed';
+        card.innerHTML = `
+            <div class="job-card-number">✓ ${job.jobNumber}</div>
+            <div class="job-card-customer">${job.customerName || job.dealerName}</div>
+            <div style="font-size:14px;color:#999;margin-top:5px;">Serial: ${job.serialNumber}</div>
+            <div style="font-size:14px;color:#28a745;margin-top:5px;font-weight:600;">COMPLETED</div>
+        `;
+        card.onclick = () => selectJob(job);
+        list.appendChild(card);
+    });
+}
+function filterJobs() {
+    const df = document.getElementById('dateFilter').value;
+    const st = document.getElementById('searchJob').value.toUpperCase().trim();
+    let list = activeTab === 'current' ? currentJobs : activeTab === 'expected' ? expectedJobs : completedJobs;
+    if (st) list = list.filter(j => j.jobNumber.toUpperCase().includes(st));
+    if (df && activeTab === 'current') {
+        list = list.filter(j => {
+            const pd = parseDateFromSheet(j.packReceived);
+            return pd && pd.toDateString() === new Date(df).toDateString();
+        });
+    }
+    if (activeTab === 'current') displayJobs(list);
+    else if (activeTab === 'expected') displayExpectedJobs(list);
+    else displayCompletedJobs(list);
+}
+function showAllJobs() {
+    document.getElementById('dateFilter').value = '';
+    document.getElementById('searchJob').value = '';
+    showJobTab(activeTab);
+}
+function showTodayJobs() {
+    showJobTab('current');
+}
+
+// ============ JOB SELECT / RESET ============
+function selectJob(job) {
+    currentJobData = job;
+    document.getElementById('currentJobNumber').textContent = job.jobNumber;
+    document.getElementById('currentCustomerName').textContent = job.customerName || job.dealerName;
+    document.getElementById('jobSelector').classList.add('hidden');
+    document.getElementById('repairForm').classList.remove('hidden');
+    resetForm();
+    initReceivedDate();
+    const hasDraft = loadDraft(job.jobNumber);
+    if (!hasDraft) showPage(1);
+    window.scrollTo(0, 0);
+}
+function resetForm() {
+    document.getElementById('mainForm').reset();
+    document.querySelectorAll('.checkbox-item.checked').forEach(i => i.classList.remove('checked'));
+    document.querySelectorAll('.radio-item.checked').forEach(i => i.classList.remove('checked'));
+    document.querySelectorAll('.validation-msg').forEach(m => m.classList.remove('show'));
+    document.getElementById('successMessage').classList.add('hidden');
+    document.getElementById('errorMessage').classList.add('hidden');
+    document.getElementById('invoiceRow').classList.remove('show');
+    serialDigitsValue = '';
+    updateSerialDisplay();
+    // Pack always checked by default
+    document.getElementById('receivedPack').checked = true;
+    document.querySelector('#receivedPack').closest('.checkbox-item').classList.add('checked');
+}
+function backToJobSelector() {
+    document.getElementById('repairForm').classList.add('hidden');
+    document.getElementById('jobSelector').classList.remove('hidden');
+    resetForm();
+    showPage(1);
+}
+
+// ============ DATA COLLECTION ============
+function collectFormData() {
+    const partIds = ['partBattery','partClamps','partShrouds','partTestButton','partDCSocket','partCigLighter','part2ACharger','part5ACharger','partCleanJaws','partNewLabels','partPanelSocket','partFrontCase','partRearCase','partFrontCaseSecondHand','partRearCaseSecondHand','partCircuitBoard'];
+    const partKeys = ['battery','clamps','shrouds','testButton','dcSocket','cigLighter','charger2A','charger5A','cleanJaws','newLabels','panelSocket','frontCase','rearCase','frontCaseSecondHand','rearCaseSecondHand','circuitBoard'];
+    const parts = {};
+    partIds.forEach((id, i) => parts[partKeys[i]] = document.getElementById(id).checked);
+
+    const cat = getPF('category');
+    return {
+        jobNumber: currentJobData.jobNumber,
+        customerName: currentJobData.customerName || currentJobData.dealerName,
+        receivedDate: document.getElementById('receivedDate').value,
+        receivedPack: document.getElementById('receivedPack').checked,
+        receivedLeads: document.getElementById('receivedLeads').checked,
+        receivedCharger: document.getElementById('receivedCharger').checked,
+        chargerPassFail: getPF('chargerTest'),
+        leadsPassFail: getPF('leadsTest'),
+        clampsPassFail: getPF('leadsTest'), // mirror for backward compat with old sheet column
+        panelSockets: getPF('panelSockets'),
+        lightsState: getPF('lightsState'),
+        serialNumber: document.getElementById('serialPrefix').value + serialDigitsValue,
+        batteryMake: getPF('batteryMake'),
+        packTest: getPF('packTest'),
+        batteryPassFail: getPF('packTest'), // writes to old column W
+        category: cat,
+        invoiceNumber: cat === 'Paid' ? document.getElementById('invoiceNumber').value : '',
+        fedexTracking: document.getElementById('fedexTracking').value,
+        additionalNotes: document.getElementById('additionalNotes').value,
+        parts: parts
+    };
+}
+
+// ============ DRAFTS ============
+function saveDraft() {
+    if (!currentJobData) return;
+    const draft = { jobNumber: currentJobData.jobNumber, currentPage, formData: collectFormData(), serialDigitsValue, timestamp: new Date().toISOString() };
+    localStorage.setItem(`draft_${currentJobData.jobNumber}`, JSON.stringify(draft));
+    alert('✅ Draft saved!\n\nResume from the job list when ready.');
+    backToJobSelector();
+}
+function loadDraft(jobNumber) {
+    const raw = localStorage.getItem(`draft_${jobNumber}`);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    if (!confirm(`📋 Draft found from ${new Date(d.timestamp).toLocaleString()}\n\nResume?`)) return false;
+    restoreFormData(d.formData, d.serialDigitsValue || '');
+    showPage(d.currentPage);
+    return true;
+}
+function deleteDraft(jobNumber) { localStorage.removeItem(`draft_${jobNumber}`); }
+function restoreFormData(d, serial) {
+    if (d.receivedDate) document.getElementById('receivedDate').value = d.receivedDate;
+    document.getElementById('receivedDateDisplay').textContent = d.receivedDate === todayISO() ? `Today (${formatDateUK(d.receivedDate)})` : formatDateUK(d.receivedDate);
+    ['receivedPack','receivedLeads','receivedCharger'].forEach(id => {
+        const v = d[id];
+        const cb = document.getElementById(id);
+        cb.checked = !!v;
+        cb.closest('.checkbox-item').classList.toggle('checked', !!v);
+    });
+    [['chargerTest', d.chargerPassFail], ['leadsTest', d.leadsPassFail], ['panelSockets', d.panelSockets], ['lightsState', d.lightsState], ['batteryMake', d.batteryMake], ['packTest', d.packTest], ['category', d.category]].forEach(([g, v]) => {
+        if (!v) return;
+        const el = document.querySelector(`[data-pf="${g}"][data-val="${v}"]`);
+        if (el) selectPF(el);
+    });
+    if (d.serialNumber) {
+        const prefix = d.serialNumber.startsWith('DZ1H') ? 'DZ1H' : 'NA';
+        document.getElementById('serialPrefix').value = prefix;
+        serialDigitsValue = serial || d.serialNumber.substring(prefix.length);
+        updateSerialDisplay();
+    }
+    if (d.invoiceNumber) document.getElementById('invoiceNumber').value = d.invoiceNumber;
+    if (d.fedexTracking) document.getElementById('fedexTracking').value = d.fedexTracking;
+    if (d.additionalNotes) document.getElementById('additionalNotes').value = d.additionalNotes;
+    toggleInvoiceField();
+    if (d.parts) {
+        const map = { battery:'partBattery', clamps:'partClamps', shrouds:'partShrouds', testButton:'partTestButton', dcSocket:'partDCSocket', cigLighter:'partCigLighter', charger2A:'part2ACharger', charger5A:'part5ACharger', cleanJaws:'partCleanJaws', newLabels:'partNewLabels', panelSocket:'partPanelSocket', frontCase:'partFrontCase', rearCase:'partRearCase', frontCaseSecondHand:'partFrontCaseSecondHand', rearCaseSecondHand:'partRearCaseSecondHand', circuitBoard:'partCircuitBoard' };
+        Object.entries(d.parts).forEach(([k, v]) => {
+            const id = map[k]; if (!id) return;
+            const cb = document.getElementById(id);
+            cb.checked = !!v;
+            cb.closest('.checkbox-item').classList.toggle('checked', !!v);
+        });
+    }
+}
+
+// ============ SUBMIT ============
+function submitForm() {
+    const data = collectFormData();
+    const btn = document.querySelector('.btn-submit');
+    const orig = btn.textContent;
+    btn.textContent = 'Saving...'; btn.disabled = true;
+    const opts = { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(data) };
+    const p1 = fetch(SERVICE_SCRIPT_URL, opts);
+    const p2 = REPAIR_HISTORY_SCRIPT_URL ? fetch(REPAIR_HISTORY_SCRIPT_URL, opts) : Promise.resolve();
+    Promise.all([p1, p2]).then(() => {
+        document.getElementById('successMessage').classList.remove('hidden');
+        document.getElementById('errorMessage').classList.add('hidden');
+        deleteDraft(data.jobNumber);
+        window.scrollTo(0, 0);
+        alert('Repair record saved!');
+        btn.textContent = orig; btn.disabled = false;
+        setTimeout(() => { backToJobSelector(); loadJobs(); }, 1500);
+    }).catch(err => {
+        document.getElementById('errorMessage').textContent = 'Error saving: ' + err.message;
+        document.getElementById('errorMessage').classList.remove('hidden');
+        btn.textContent = orig; btn.disabled = false;
+        window.scrollTo(0, 0);
+    });
+}
+
+// ============ INIT ============
+loadJobs();
+updateProgress();
+updateSerialDisplay();
+</script>
+</body>
+</html>
