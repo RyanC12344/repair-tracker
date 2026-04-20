@@ -884,7 +884,6 @@ async function submitBookingAndUPS() {
         lastBookingData = { ...bookingData, customerCity, customerEmail };
         lastUPSResult = {
             trackingNumber: labelResult.trackingNumber,
-            labelBase64: labelResult.labelBase64,
             pickupConfirmation: pickupResult.pickupConfirmation
         };
 
@@ -917,7 +916,7 @@ async function sendLabelEmail() {
             action:'sendEmail', jobNumber:lastBookingData.jobNumber,
             customerName:lastBookingData.customerName, customerEmail:lastBookingData.customerEmail,
             pickupDate:lastBookingData.pickupDate, pickupConfirmation:lastUPSResult.pickupConfirmation,
-            trackingNumber:lastUPSResult.trackingNumber, labelBase64:lastUPSResult.labelBase64
+            trackingNumber:lastUPSResult.trackingNumber
         })});
         const result=await res.json();
         if(result.success) alert(`✅ Email sent to ${lastBookingData.customerEmail}`);
@@ -945,7 +944,7 @@ async function sendEditedEmail() {
             customerName:lastBookingData.customerName, customerEmail:lastBookingData.customerEmail,
             emailSubject:document.getElementById('modalSubject').value,
             customEmailBody:document.getElementById('modalBody').value,
-            trackingNumber:lastUPSResult.trackingNumber, labelBase64:lastUPSResult.labelBase64
+            trackingNumber:lastUPSResult.trackingNumber
         })});
         const result=await res.json();
         if(result.success){alert(`✅ Email sent to ${lastBookingData.customerEmail}`);closeEmailModal();}
