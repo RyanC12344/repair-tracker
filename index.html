@@ -221,7 +221,8 @@ textarea { resize: vertical; min-height: 80px; }
                 </div>
                 <div class="address-results hidden" id="addressResults"><select id="addressSelect" onchange="selectAddress()"><option value="">— Select an address —</option></select></div>
                 <div style="margin-top:10px;">
-                    <input type="text" id="bkAddress" placeholder="Full address (auto-filled or type manually)" style="margin-bottom:8px;">
+                    <input type="text" id="bkAddress" placeholder="Street address" style="margin-bottom:8px;">
+                    <input type="text" id="bkCity" placeholder="Town / City" style="margin-bottom:8px;">
                     <input type="text" id="bkPostcodeFinal" placeholder="Postcode" style="text-transform:uppercase;">
                 </div>
             </div>
@@ -764,7 +765,7 @@ function openBookingPortal() {
     document.getElementById('bookingError').classList.add('hidden');
     document.getElementById('upsResults').classList.add('hidden');
     document.getElementById('bookingValidation').classList.remove('show');
-    ['bkCustomerName','bkPostcode','bkAddress','bkPostcodeFinal','bkPhone','bkEmail','bkFault'].forEach(id=>document.getElementById(id).value='');
+    ['bkCustomerName','bkPostcode','bkAddress','bkCity','bkPostcodeFinal','bkPhone','bkEmail','bkFault'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('bkPickupDate').value='';
     document.getElementById('addressResults').classList.add('hidden');
     bookingPackCount=1;
@@ -804,15 +805,19 @@ async function lookupPostcode() {
         const select=document.getElementById('addressSelect');
         select.innerHTML='<option value="">— Select an address —</option>';
         data.result.forEach((addr,i)=>{
-            const parts=[addr.line_1,addr.line_2,addr.line_3,addr.post_town,addr.county].filter(p=>p&&p.trim());
-            const opt=document.createElement('option');opt.value=i;opt.textContent=parts.join(', ');opt.dataset.address=parts.join(', ');
+            const streetParts=[addr.line_1,addr.line_2,addr.line_3].filter(p=>p&&p.trim());
+            const displayParts=[...streetParts,addr.post_town,addr.county].filter(p=>p&&p.trim());
+            const opt=document.createElement('option');opt.value=i;opt.textContent=displayParts.join(', ');
+            opt.dataset.street=streetParts.join(', ');
+            opt.dataset.city=addr.post_town||'';
+            opt.dataset.address=displayParts.join(', ');
             select.appendChild(opt);
         });
         document.getElementById('addressResults').classList.remove('hidden');
         document.getElementById('bkPostcodeFinal').value=(data.result[0].postcode||postcode).toUpperCase();
     } catch(err){console.error(err);alert('Address lookup error. Enter address manually.');}
 }
-function selectAddress() { const opt=document.getElementById('addressSelect').options[document.getElementById('addressSelect').selectedIndex]; if(opt&&opt.dataset.address) document.getElementById('bkAddress').value=opt.dataset.address; }
+function selectAddress() { const opt=document.getElementById('addressSelect').options[document.getElementById('addressSelect').selectedIndex]; if(opt&&opt.dataset.address) { document.getElementById('bkAddress').value=opt.dataset.street||opt.dataset.address; document.getElementById('bkCity').value=opt.dataset.city||''; } }
 
 // ============ BOOKING + UPS (combined) ============
 function validateBooking() {
@@ -833,13 +838,10 @@ async function submitBookingAndUPS() {
 
     const customerName=document.getElementById('bkCustomerName').value.trim();
     const customerAddress=document.getElementById('bkAddress').value.trim();
+    const customerCity=document.getElementById('bkCity').value.trim();
     const customerPostcode=document.getElementById('bkPostcodeFinal').value.trim().toUpperCase();
     const customerPhone=document.getElementById('bkPhone').value.trim();
     const customerEmail=document.getElementById('bkEmail').value.trim();
-
-    // Extract city from address (last meaningful part before postcode)
-    const addrParts=customerAddress.split(',').map(p=>p.trim()).filter(p=>p);
-    const customerCity=addrParts.length>1?addrParts[addrParts.length-1]:addrParts[0]||'';
 
     const bookingData = {
         action:'booking', jobNumber:nextJobNumber, callDate:formatDateUK(todayISO()),
