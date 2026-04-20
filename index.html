@@ -12,159 +12,145 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .header .brand { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.9; margin-bottom: 5px; font-weight: 600; }
 .header h1 { font-size: 28px; margin: 0; font-weight: 700; }
 .header p { margin-top: 5px; font-size: 13px; opacity: 0.85; }
-
 .job-info { background: #1a2332; padding: 20px; border-bottom: 3px solid #c41e3a; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; color: white; gap: 15px; }
 .back-to-jobs-btn { background: #c41e3a; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; white-space: nowrap; }
-.back-to-jobs-btn:hover { background: #a01729; transform: translateX(-3px); }
+.back-to-jobs-btn:hover { background: #a01729; }
 .job-info-item { font-size: 18px; font-weight: 600; }
 .job-info-label { color: #aaa; font-size: 12px; font-weight: normal; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
 .customer-address { font-size: 13px; color: #bbb; margin-top: 3px; font-weight: normal; }
-
 .form-section { padding: 30px; }
 .section-page { display: none; animation: fadeIn 0.3s; }
 .section-page.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
 .section-title { font-size: 24px; font-weight: 700; color: #1a2332; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #e0e0e0; }
-
-.progress-bar { background: #e0e0e0; height: 12px; border-radius: 10px; margin-bottom: 20px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
-.progress-fill { background: linear-gradient(90deg, #c41e3a 0%, #a01729 100%); height: 100%; transition: width 0.4s ease; box-shadow: 0 0 10px rgba(196, 30, 58, 0.5); }
-.progress-text { text-align: center; color: #1a2332; font-size: 14px; margin-bottom: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-
+.progress-bar { background: #e0e0e0; height: 12px; border-radius: 10px; margin-bottom: 20px; overflow: hidden; }
+.progress-fill { background: linear-gradient(90deg, #c41e3a 0%, #a01729 100%); height: 100%; transition: width 0.4s ease; }
+.progress-text { text-align: center; color: #1a2332; font-size: 14px; margin-bottom: 15px; font-weight: 600; text-transform: uppercase; }
 .form-group { margin-bottom: 25px; }
 label { display: block; font-weight: 600; margin-bottom: 8px; color: #333; font-size: 16px; }
 .sub-label { font-size: 14px; color: #666; font-weight: normal; }
 input[type="text"], input[type="number"], input[type="date"], input[type="email"], input[type="tel"], textarea, select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; font-family: inherit; background: white; }
 input:focus, textarea:focus, select:focus { outline: none; border-color: #c41e3a; }
 textarea { resize: vertical; min-height: 80px; }
-
 .date-row { display: flex; align-items: center; gap: 10px; background: #f8f9fa; padding: 10px 14px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e0e0e0; font-size: 14px; }
 .date-row .date-label { color: #666; }
 .date-row .date-value { font-weight: 600; color: #1a2332; flex: 1; }
-.date-row input[type="date"] { width: auto; padding: 6px 8px; font-size: 14px; }
 .edit-date-btn { background: none; border: none; color: #c41e3a; font-size: 13px; cursor: pointer; text-decoration: underline; padding: 4px 8px; }
-
 .checkbox-group { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 10px; }
 .checkbox-item { display: flex; align-items: center; background: #f8f9fa; padding: 14px 16px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; user-select: none; }
 .checkbox-item:hover { background: #e9ecef; }
-.checkbox-item input[type="checkbox"] { width: 22px; height: 22px; margin-right: 10px; cursor: pointer; flex-shrink: 0; pointer-events: none; }
+.checkbox-item input[type="checkbox"] { width: 22px; height: 22px; margin-right: 10px; pointer-events: none; }
 .checkbox-item.checked { background: #d4edda; border-color: #28a745; }
-.checkbox-item label { margin: 0; cursor: pointer; font-weight: 500; pointer-events: none; }
-
+.checkbox-item label { margin: 0; font-weight: 500; pointer-events: none; }
 .radio-group { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px; }
 .radio-group.three-col { grid-template-columns: repeat(3, 1fr); }
 .radio-group.sub { margin-top: 8px; }
 .radio-item { display: flex; align-items: center; justify-content: center; background: #f8f9fa; padding: 16px 20px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; font-weight: 600; font-size: 16px; user-select: none; text-align: center; }
 .radio-item.small { padding: 10px 14px; font-size: 14px; }
 .radio-item:hover { background: #e9ecef; }
-.radio-item input[type="radio"] { display: none; }
 .radio-item.checked { background: #d4edda; border-color: #28a745; color: #155724; }
 .radio-item.fail.checked { background: #f8d7da; border-color: #dc3545; color: #721c24; }
 .radio-item.neutral.checked { background: #d1ecf1; border-color: #17a2b8; color: #0c5460; }
 .radio-item.warranty.checked { background: #8B0000; border-color: #8B0000; color: white; }
 .radio-item.paid.checked { background: #34a853; border-color: #34a853; color: white; }
 .radio-item.goodwill.checked { background: #fbbc04; border-color: #fbbc04; color: #1a2332; }
-
-.pf-row { display: grid; grid-template-columns: 1fr; gap: 18px; }
+.pf-row { display: grid; gap: 18px; }
 .pf-card { background: #fff; border: 2px solid #e0e0e0; border-radius: 10px; padding: 16px; }
 .pf-card .pf-title { font-size: 17px; font-weight: 700; color: #1a2332; margin-bottom: 12px; }
 .pf-card.disabled { opacity: 0.45; background: #f0f0f0; }
 .pf-card.disabled .pf-title::after { content: ' (not received)'; font-weight: normal; color: #999; font-size: 14px; }
 .charger-type-block { margin-top: 14px; padding-top: 14px; border-top: 1px solid #e0e0e0; }
 .charger-type-block .sub-label { margin-bottom: 8px; display: block; }
-
 .serial-block { background: #f8f9fa; border-radius: 10px; padding: 18px; border: 2px solid #e0e0e0; }
 .serial-display { display: flex; gap: 10px; align-items: stretch; margin-bottom: 16px; }
 .serial-prefix-select { flex: 0 0 110px; }
 .serial-prefix-select select { height: 100%; padding: 14px 8px; font-size: 18px; font-weight: 700; }
 .serial-digits { flex: 1; background: white; border: 2px solid #ddd; border-radius: 8px; padding: 14px; font-size: 28px; font-weight: 700; text-align: center; letter-spacing: 6px; color: #1a2332; min-height: 60px; display: flex; align-items: center; justify-content: center; font-family: 'Courier New', monospace; }
 .serial-digits.empty { color: #ccc; }
-
 .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.numpad button { padding: 22px; font-size: 26px; font-weight: 700; background: white; border: 2px solid #ddd; border-radius: 10px; cursor: pointer; transition: all 0.15s; color: #1a2332; }
-.numpad button:hover { background: #e9ecef; border-color: #c41e3a; }
-.numpad button:active { transform: scale(0.96); background: #c41e3a; color: white; }
+.numpad button { padding: 22px; font-size: 26px; font-weight: 700; background: white; border: 2px solid #ddd; border-radius: 10px; cursor: pointer; color: #1a2332; }
+.numpad button:active { background: #c41e3a; color: white; }
 .numpad button.action { background: #1a2332; color: white; font-size: 16px; }
-.numpad button.action:hover { background: #c41e3a; }
 .numpad button.clear { background: #6c757d; color: white; font-size: 16px; }
-
 .navigation-buttons { display: flex; gap: 15px; margin-top: 30px; }
-.btn { flex: 1; padding: 18px; border: none; border-radius: 8px; font-size: 18px; font-weight: 700; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+.btn { flex: 1; padding: 18px; border: none; border-radius: 8px; font-size: 18px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
 .btn:hover { transform: translateY(-2px); }
-.btn:active { transform: translateY(0); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 .btn-previous { background: #6c757d; color: white; }
 .btn-next { background: #c41e3a; color: white; }
-.btn-next:hover { background: #a01729; box-shadow: 0 10px 30px rgba(196, 30, 58, 0.4); }
 .btn-submit { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; }
-.btn-submit:hover { box-shadow: 0 10px 30px rgba(40, 167, 69, 0.4); }
 .btn-save-draft { background: #ffc107; color: #1a2332; font-weight: 700; margin-top: 20px; width: 100%; }
-.btn-save-draft:hover { background: #e0a800; }
-
 .validation-msg { background: #fff3cd; border: 2px solid #ffc107; color: #856404; padding: 12px 16px; border-radius: 8px; margin-top: 15px; font-weight: 600; display: none; }
-.validation-msg.show { display: block; animation: fadeIn 0.3s; }
-
+.validation-msg.show { display: block; }
 .job-selector { padding: 30px; }
 .job-list { display: grid; gap: 15px; margin-top: 20px; }
 .job-card { background: #f8f9fa; padding: 20px; border-radius: 8px; border: 2px solid #ddd; cursor: pointer; transition: all 0.3s; text-align: left; }
-.job-card:hover { border-color: #c41e3a; background: #fff5f5; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+.job-card:hover { border-color: #c41e3a; background: #fff5f5; transform: translateY(-2px); }
 .job-card-number { font-size: 20px; font-weight: 700; color: #1a2332; margin-bottom: 5px; }
 .job-card-customer { font-size: 16px; color: #666; }
-
 .hidden { display: none !important; }
 .success-message { background: #d4edda; color: #155724; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #c3e6cb; text-align: center; font-weight: 600; }
 .error-message { background: #f8d7da; color: #721c24; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #f5c6cb; text-align: center; font-weight: 600; }
 .loading { text-align: center; padding: 40px; font-size: 18px; color: #666; }
-
 .job-tab.active { border-bottom-color: #c41e3a !important; color: #c41e3a !important; }
-.job-tab:hover { background: #f8f9fa; }
 .expected-today { border: 3px solid #28a745 !important; background: #d4edda !important; }
 .expected-tomorrow { border: 3px solid #ffc107 !important; background: #fff3cd !important; }
 .expected-soon { border: 3px solid #17a2b8 !important; background: #d1ecf1 !important; }
 .repair-today { border: 3px solid #28a745 !important; background: #d4edda !important; }
 .repair-completed { opacity: 0.75; background: #f8f9fa !important; }
 .repair-completed .job-card-number { color: #28a745; }
-
 .stats-dashboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
-.stat-card { background: white; border: 2px solid #e0e0e0; border-radius: 12px; padding: 20px; text-align: center; transition: all 0.3s; }
-.stat-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
-.stat-today { border-color: #c41e3a; }
-.stat-current { border-color: #1a2332; }
-.stat-completed { border-color: #28a745; }
+.stat-card { background: white; border: 2px solid #e0e0e0; border-radius: 12px; padding: 20px; text-align: center; }
 .stat-number { font-size: 36px; font-weight: 700; margin-bottom: 8px; }
-.stat-today .stat-number { color: #c41e3a; }
-.stat-current .stat-number { color: #1a2332; }
-.stat-completed .stat-number { color: #28a745; }
+.stat-today { border-color: #c41e3a; } .stat-today .stat-number { color: #c41e3a; }
+.stat-current { border-color: #1a2332; } .stat-current .stat-number { color: #1a2332; }
+.stat-completed { border-color: #28a745; } .stat-completed .stat-number { color: #28a745; }
 .stat-label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #666; font-weight: 600; }
-
 .invoice-row { margin-top: 15px; display: none; }
-.invoice-row.show { display: block; animation: fadeIn 0.3s; }
+.invoice-row.show { display: block; }
 
-/* ===== BOOKING PORTAL STYLES ===== */
-.new-booking-btn { display: block; width: 100%; padding: 18px; background: linear-gradient(135deg, #1a2332 0%, #2d3e50 100%); color: white; border: 3px solid #c41e3a; border-radius: 10px; font-size: 18px; font-weight: 700; cursor: pointer; transition: all 0.3s; margin-bottom: 25px; letter-spacing: 0.5px; }
-.new-booking-btn:hover { background: #c41e3a; transform: translateY(-2px); box-shadow: 0 8px 25px rgba(196,30,58,0.4); }
+/* BOOKING + UPS STYLES */
+.action-btn-row { display: flex; gap: 10px; margin-bottom: 15px; }
+.new-booking-btn, .rebook-btn { display: block; width: 100%; padding: 18px; background: linear-gradient(135deg, #1a2332 0%, #2d3e50 100%); color: white; border: 3px solid #c41e3a; border-radius: 10px; font-size: 18px; font-weight: 700; cursor: pointer; transition: all 0.3s; letter-spacing: 0.5px; }
+.new-booking-btn:hover, .rebook-btn:hover { background: #c41e3a; transform: translateY(-2px); }
+.rebook-btn { background: linear-gradient(135deg, #2d3e50 0%, #1a2332 100%); border-color: #ffc107; font-size: 16px; }
+.rebook-btn:hover { background: #ffc107; color: #1a2332; }
 
 .booking-header { background: #1a2332; padding: 20px; border-bottom: 3px solid #c41e3a; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; color: white; gap: 15px; }
 .booking-job-number { font-size: 22px; font-weight: 700; }
 .booking-job-label { font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px; }
-
 .postcode-lookup { display: flex; gap: 10px; margin-bottom: 10px; }
 .postcode-lookup input { flex: 1; }
 .postcode-lookup button { flex: 0 0 auto; padding: 12px 20px; background: #1a2332; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 16px; white-space: nowrap; }
 .postcode-lookup button:hover { background: #c41e3a; }
-
 .address-results { margin-bottom: 15px; }
 .address-results select { padding: 12px; font-size: 16px; }
-
 .email-suffix-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.email-suffix-btn { padding: 8px 14px; background: #e7f3ff; border: 2px solid #667eea; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 600; color: #667eea; transition: all 0.2s; }
+.email-suffix-btn { padding: 8px 14px; background: #e7f3ff; border: 2px solid #667eea; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 600; color: #667eea; }
 .email-suffix-btn:hover { background: #667eea; color: white; }
-
-.pack-count-row { display: flex; gap: 12px; margin-top: 10px; }
-.pack-count-btn { flex: 1; padding: 18px; text-align: center; background: #f8f9fa; border: 2px solid transparent; border-radius: 8px; font-weight: 700; font-size: 18px; cursor: pointer; transition: all 0.2s; }
-.pack-count-btn:hover { background: #e9ecef; }
+.pack-count-row { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.pack-count-btn { flex: 1; min-width: 70px; padding: 18px; text-align: center; background: #f8f9fa; border: 2px solid transparent; border-radius: 8px; font-weight: 700; font-size: 18px; cursor: pointer; }
 .pack-count-btn.selected { background: #d4edda; border-color: #28a745; color: #155724; }
 .pack-weight { text-align: center; margin-top: 10px; font-size: 15px; color: #666; font-weight: 600; }
+
+/* UPS action buttons */
+.ups-actions { margin-top: 20px; display: grid; gap: 12px; }
+.ups-btn { padding: 16px; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+.ups-btn:hover { transform: translateY(-2px); }
+.ups-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.ups-btn-label { background: #1a2332; color: white; }
+.ups-btn-send { background: #28a745; color: white; }
+.ups-btn-resend { background: #667eea; color: white; }
+
+/* Modal for email edit */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: center; justify-content: center; }
+.modal { background: white; border-radius: 12px; padding: 30px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+.modal h3 { margin-bottom: 15px; color: #1a2332; }
+.modal textarea { min-height: 200px; margin-bottom: 15px; }
+.modal-btns { display: flex; gap: 10px; }
+
+/* Rebook modal */
+.rebook-section { padding: 30px; }
 </style>
 </head>
 <body>
@@ -177,10 +163,13 @@ textarea { resize: vertical; min-height: 80px; }
 
     <!-- ===================== JOB SELECTOR ===================== -->
     <div id="jobSelector" class="job-selector">
-        <button class="new-booking-btn" onclick="openBookingPortal()">+ New Booking</button>
+        <div class="action-btn-row">
+            <button class="new-booking-btn" onclick="openBookingPortal()" style="flex:2;">+ New Booking</button>
+            <button class="rebook-btn" onclick="openRebookModal()" style="flex:1;">Rebook Pickup</button>
+        </div>
 
         <h2 class="section-title">Select a Job to Begin Repair</h2>
-        <div style="text-align: center; color: #1a2332; font-weight: 600; margin-bottom: 20px; font-size: 16px;" id="currentMonthDisplay"></div>
+        <div style="text-align:center;color:#1a2332;font-weight:600;margin-bottom:20px;font-size:16px;" id="currentMonthDisplay"></div>
 
         <div class="stats-dashboard">
             <div class="stat-card stat-today"><div class="stat-number" id="statToday">0</div><div class="stat-label">Due Today</div></div>
@@ -188,77 +177,57 @@ textarea { resize: vertical; min-height: 80px; }
             <div class="stat-card stat-completed"><div class="stat-number" id="statCompleted">0</div><div class="stat-label">Completed This Month</div></div>
         </div>
 
-        <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e0e0e0;">
-            <button id="tabCurrent" class="job-tab active" onclick="showJobTab('current')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid #c41e3a; color: #c41e3a;">Current (<span id="currentCount">0</span>)</button>
-            <button id="tabExpected" class="job-tab" onclick="showJobTab('expected')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; color: #999;">Expected (<span id="expectedCount">0</span>)</button>
-            <button id="tabCompleted" class="job-tab" onclick="showJobTab('completed')" style="flex: 1; padding: 15px; border: none; background: none; font-weight: 600; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; color: #999;">Completed (<span id="completedCount">0</span>)</button>
+        <div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:2px solid #e0e0e0;">
+            <button id="tabCurrent" class="job-tab active" onclick="showJobTab('current')" style="flex:1;padding:15px;border:none;background:none;font-weight:600;font-size:16px;cursor:pointer;border-bottom:3px solid #c41e3a;color:#c41e3a;">Current (<span id="currentCount">0</span>)</button>
+            <button id="tabExpected" class="job-tab" onclick="showJobTab('expected')" style="flex:1;padding:15px;border:none;background:none;font-weight:600;font-size:16px;cursor:pointer;border-bottom:3px solid transparent;color:#999;">Expected (<span id="expectedCount">0</span>)</button>
+            <button id="tabCompleted" class="job-tab" onclick="showJobTab('completed')" style="flex:1;padding:15px;border:none;background:none;font-weight:600;font-size:16px;cursor:pointer;border-bottom:3px solid transparent;color:#999;">Completed (<span id="completedCount">0</span>)</button>
         </div>
 
-        <div style="margin-bottom: 25px;">
-            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-                <div style="flex: 1;"><label for="dateFilter">Filter by Date:</label><input type="date" id="dateFilter" onchange="filterJobs()"></div>
-                <div style="flex: 1;"><label for="searchJob">Search Job Number:</label><input type="text" id="searchJob" placeholder="e.g., S0401" oninput="filterJobs()"></div>
+        <div style="margin-bottom:25px;">
+            <div style="display:flex;gap:15px;margin-bottom:15px;">
+                <div style="flex:1;"><label for="dateFilter">Filter by Date:</label><input type="date" id="dateFilter" onchange="filterJobs()"></div>
+                <div style="flex:1;"><label for="searchJob">Search Job Number:</label><input type="text" id="searchJob" placeholder="e.g., S0401" oninput="filterJobs()"></div>
             </div>
-            <button onclick="showAllJobs()" style="padding: 10px 20px; background: #1a2332; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Show All</button>
-            <button onclick="showTodayJobs()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; margin-left: 10px;">Today's Jobs</button>
+            <button onclick="showAllJobs()" style="padding:10px 20px;background:#1a2332;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Show All</button>
+            <button onclick="showTodayJobs()" style="padding:10px 20px;background:#28a745;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-left:10px;">Today's Jobs</button>
         </div>
 
         <div class="loading" id="loadingJobs">Loading jobs...</div>
-        <div id="jobCount" style="text-align: center; color: #666; margin-bottom: 15px; font-weight: 600;"></div>
+        <div id="jobCount" style="text-align:center;color:#666;margin-bottom:15px;font-weight:600;"></div>
         <div class="job-list" id="jobList"></div>
     </div>
 
     <!-- ===================== BOOKING PORTAL ===================== -->
     <div id="bookingPortal" class="hidden">
         <div class="booking-header">
-            <button class="back-to-jobs-btn" onclick="closeBookingPortal()"><span style="font-size: 18px;">←</span> Back</button>
-            <div>
-                <span class="booking-job-label">New Job Number</span>
-                <span class="booking-job-number" id="bookingJobNumber">—</span>
-            </div>
-            <div>
-                <span class="booking-job-label">Call Date</span>
-                <span id="bookingCallDate">—</span>
-            </div>
+            <button class="back-to-jobs-btn" onclick="closeBookingPortal()"><span style="font-size:18px;">←</span> Back</button>
+            <div><span class="booking-job-label">New Job Number</span><span class="booking-job-number" id="bookingJobNumber">—</span></div>
+            <div><span class="booking-job-label">Call Date</span><span id="bookingCallDate">—</span></div>
         </div>
 
         <div class="form-section">
-            <div id="bookingSuccess" class="success-message hidden">✓ Booking saved to sheet!</div>
+            <div id="bookingSuccess" class="success-message hidden"></div>
             <div id="bookingError" class="error-message hidden"></div>
 
             <div class="section-title">Book New Repair</div>
 
-            <!-- Customer Name -->
-            <div class="form-group">
-                <label for="bkCustomerName">Customer Name</label>
-                <input type="text" id="bkCustomerName" placeholder="Enter customer name">
-            </div>
+            <div class="form-group"><label for="bkCustomerName">Customer Name</label><input type="text" id="bkCustomerName" placeholder="Enter customer name"></div>
 
-            <!-- Postcode Lookup -->
             <div class="form-group">
                 <label>Address</label>
                 <div class="postcode-lookup">
-                    <input type="text" id="bkPostcode" placeholder="Enter postcode" maxlength="10" style="text-transform: uppercase;">
+                    <input type="text" id="bkPostcode" placeholder="Enter postcode" maxlength="10" style="text-transform:uppercase;">
                     <button type="button" onclick="lookupPostcode()">Find Address</button>
                 </div>
-                <div class="address-results hidden" id="addressResults">
-                    <select id="addressSelect" onchange="selectAddress()">
-                        <option value="">— Select an address —</option>
-                    </select>
-                </div>
-                <div style="margin-top: 10px;">
-                    <input type="text" id="bkAddress" placeholder="Full address (auto-filled or type manually)" style="margin-bottom: 8px;">
-                    <input type="text" id="bkPostcodeFinal" placeholder="Postcode" style="text-transform: uppercase;">
+                <div class="address-results hidden" id="addressResults"><select id="addressSelect" onchange="selectAddress()"><option value="">— Select an address —</option></select></div>
+                <div style="margin-top:10px;">
+                    <input type="text" id="bkAddress" placeholder="Full address (auto-filled or type manually)" style="margin-bottom:8px;">
+                    <input type="text" id="bkPostcodeFinal" placeholder="Postcode" style="text-transform:uppercase;">
                 </div>
             </div>
 
-            <!-- Phone -->
-            <div class="form-group">
-                <label for="bkPhone">Phone Number</label>
-                <input type="tel" id="bkPhone" placeholder="Enter phone number">
-            </div>
+            <div class="form-group"><label for="bkPhone">Phone Number</label><input type="tel" id="bkPhone" placeholder="Enter phone number"></div>
 
-            <!-- Email with quick suffixes -->
             <div class="form-group">
                 <label for="bkEmail">Email Address</label>
                 <input type="email" id="bkEmail" placeholder="Enter email address">
@@ -272,34 +241,67 @@ textarea { resize: vertical; min-height: 80px; }
                 </div>
             </div>
 
-            <!-- Fault -->
-            <div class="form-group">
-                <label for="bkFault">Fault Reported</label>
-                <textarea id="bkFault" placeholder="Describe the fault reported by the customer"></textarea>
-            </div>
+            <div class="form-group"><label for="bkFault">Fault Reported</label><textarea id="bkFault" placeholder="Describe the fault reported by the customer"></textarea></div>
 
-            <!-- Number of Packs -->
             <div class="form-group">
                 <label>Number of Packs</label>
                 <div class="pack-count-row">
-                    <div class="pack-count-btn selected" data-packs="1" onclick="selectPackCount(this)">1 Pack</div>
-                    <div class="pack-count-btn" data-packs="2" onclick="selectPackCount(this)">2 Packs</div>
-                    <div class="pack-count-btn" data-packs="3" onclick="selectPackCount(this)">3 Packs</div>
+                    <div class="pack-count-btn selected" data-packs="1" onclick="selectPackCount(this)">1</div>
+                    <div class="pack-count-btn" data-packs="2" onclick="selectPackCount(this)">2</div>
+                    <div class="pack-count-btn" data-packs="3" onclick="selectPackCount(this)">3</div>
+                    <div class="pack-count-btn" data-packs="4" onclick="selectPackCount(this)">4</div>
                 </div>
                 <div class="pack-weight" id="packWeightDisplay">Shipment weight: 10 kg</div>
             </div>
 
-            <!-- Pickup Date -->
-            <div class="form-group">
-                <label for="bkPickupDate">Collection Date <span class="sub-label">(Date UPS will collect from customer)</span></label>
-                <input type="date" id="bkPickupDate">
-            </div>
+            <div class="form-group"><label for="bkPickupDate">Collection Date <span class="sub-label">(UPS pickup from customer)</span></label><input type="date" id="bkPickupDate"></div>
 
             <div class="validation-msg" id="bookingValidation">Please fill in all required fields: name, address, postcode, phone, email, and pickup date.</div>
 
-            <!-- Booking Submit -->
             <div class="navigation-buttons">
-                <button type="button" class="btn btn-submit" onclick="submitBooking()" id="bookingSubmitBtn">Save Booking to Sheet</button>
+                <button type="button" class="btn btn-submit" onclick="submitBookingAndUPS()" id="bookingSubmitBtn">Book Repair, Generate Label & Schedule Pickup</button>
+            </div>
+
+            <!-- UPS results (shown after successful booking) -->
+            <div id="upsResults" class="hidden" style="margin-top:25px;">
+                <div class="success-message" id="upsSuccessMsg"></div>
+                <div class="ups-actions">
+                    <button class="ups-btn ups-btn-send" onclick="sendLabelEmail()">Send Label to Customer</button>
+                    <button class="ups-btn ups-btn-resend" onclick="openResendModal()">Resend / Edit Email</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== REBOOK PICKUP MODAL ===================== -->
+    <div id="rebookPortal" class="hidden">
+        <div class="booking-header">
+            <button class="back-to-jobs-btn" onclick="closeRebookPortal()"><span style="font-size:18px;">←</span> Back</button>
+            <div><span class="booking-job-label">Rebook Collection</span><span class="booking-job-number">UPS Pickup</span></div>
+        </div>
+        <div class="rebook-section form-section">
+            <div class="section-title">Rebook UPS Collection</div>
+            <div id="rebookSuccess" class="success-message hidden"></div>
+            <div id="rebookError" class="error-message hidden"></div>
+
+            <div class="form-group"><label for="rbJobNumber">Job Number</label><input type="text" id="rbJobNumber" placeholder="e.g., S0432"></div>
+            <div class="form-group"><label for="rbCustomerName">Customer Name</label><input type="text" id="rbCustomerName" placeholder="Customer name"></div>
+            <div class="form-group"><label for="rbAddress">Address</label><input type="text" id="rbAddress" placeholder="Full address"></div>
+            <div class="form-group"><label for="rbPostcode">Postcode</label><input type="text" id="rbPostcode" placeholder="Postcode" style="text-transform:uppercase;"></div>
+            <div class="form-group"><label for="rbPhone">Phone Number</label><input type="tel" id="rbPhone" placeholder="Phone number"></div>
+            <div class="form-group">
+                <label>Number of Packs</label>
+                <div class="pack-count-row">
+                    <div class="pack-count-btn selected" data-rpacks="1" onclick="selectRebookPackCount(this)">1</div>
+                    <div class="pack-count-btn" data-rpacks="2" onclick="selectRebookPackCount(this)">2</div>
+                    <div class="pack-count-btn" data-rpacks="3" onclick="selectRebookPackCount(this)">3</div>
+                    <div class="pack-count-btn" data-rpacks="4" onclick="selectRebookPackCount(this)">4</div>
+                </div>
+            </div>
+            <div class="form-group"><label for="rbPickupDate">New Collection Date</label><input type="date" id="rbPickupDate"></div>
+
+            <div class="navigation-buttons">
+                <button type="button" class="btn btn-submit" onclick="submitRebook()" id="rebookSubmitBtn">Rebook Pickup</button>
             </div>
         </div>
     </div>
@@ -307,23 +309,22 @@ textarea { resize: vertical; min-height: 80px; }
     <!-- ===================== REPAIR FORM ===================== -->
     <div id="repairForm" class="hidden">
         <div class="job-info">
-            <button class="back-to-jobs-btn" onclick="backToJobSelector()"><span style="font-size: 18px;">←</span> Back</button>
+            <button class="back-to-jobs-btn" onclick="backToJobSelector()"><span style="font-size:18px;">←</span> Back</button>
             <div class="job-info-item"><span class="job-info-label">Job Number</span><span id="currentJobNumber">-</span></div>
-            <div class="job-info-item" style="text-align: right;">
-                <span class="job-info-label">Customer</span>
-                <span id="currentCustomerName">-</span>
+            <div class="job-info-item" style="text-align:right;">
+                <span class="job-info-label">Customer</span><span id="currentCustomerName">-</span>
                 <div class="customer-address" id="currentCustomerAddress"></div>
             </div>
         </div>
 
         <div class="form-section">
-            <div id="successMessage" class="success-message hidden">✓ Repair record saved successfully!</div>
+            <div id="successMessage" class="success-message hidden">✓ Repair record saved!</div>
             <div id="errorMessage" class="error-message hidden"></div>
-
             <div class="progress-text"><span id="progressText">Step 1 of 5</span></div>
-            <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width: 20%"></div></div>
+            <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:20%"></div></div>
 
             <form id="mainForm">
+                <!-- Page 1: Items received -->
                 <div class="section-page active" data-page="1">
                     <div class="section-title">Package Received</div>
                     <div class="date-row">
@@ -332,8 +333,7 @@ textarea { resize: vertical; min-height: 80px; }
                         <input type="date" id="receivedDate" class="hidden">
                         <button type="button" class="edit-date-btn" onclick="toggleDateEdit()">edit</button>
                     </div>
-                    <div class="form-group">
-                        <label>Items received</label>
+                    <div class="form-group"><label>Items received</label>
                         <div class="checkbox-group">
                             <div class="checkbox-item checked" onclick="toggleCheckbox('receivedPack')"><input type="checkbox" id="receivedPack" checked><label>Pack</label></div>
                             <div class="checkbox-item" onclick="toggleCheckbox('receivedLeads')"><input type="checkbox" id="receivedLeads"><label>Leads</label></div>
@@ -345,14 +345,14 @@ textarea { resize: vertical; min-height: 80px; }
                     <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
 
+                <!-- Page 2: Tests -->
                 <div class="section-page" data-page="2">
                     <div class="section-title">Initial Tests</div>
                     <div class="pf-row">
-                        <div class="pf-card" id="cardCharger">
-                            <div class="pf-title">Charger</div>
+                        <div class="pf-card" id="cardCharger"><div class="pf-title">Charger</div>
                             <div class="radio-group">
-                                <div class="radio-item" data-pf="chargerTest" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
-                                <div class="radio-item fail" data-pf="chargerTest" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
+                                <div class="radio-item" data-pf="chargerTest" data-val="PASS" onclick="selectPF(this)">✓ Pass</div>
+                                <div class="radio-item fail" data-pf="chargerTest" data-val="FAIL" onclick="selectPF(this)">✗ Fail</div>
                             </div>
                             <div class="charger-type-block"><span class="sub-label">Charger type:</span>
                                 <div class="radio-group three-col sub">
@@ -362,27 +362,26 @@ textarea { resize: vertical; min-height: 80px; }
                                 </div>
                             </div>
                         </div>
-                        <div class="pf-card" id="cardLeads">
-                            <div class="pf-title">Leads</div>
+                        <div class="pf-card" id="cardLeads"><div class="pf-title">Leads</div>
                             <div class="radio-group">
-                                <div class="radio-item" data-pf="leadsTest" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
-                                <div class="radio-item fail" data-pf="leadsTest" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
+                                <div class="radio-item" data-pf="leadsTest" data-val="PASS" onclick="selectPF(this)">✓ Pass</div>
+                                <div class="radio-item fail" data-pf="leadsTest" data-val="FAIL" onclick="selectPF(this)">✗ Fail</div>
                             </div>
                         </div>
                         <div class="pf-card"><div class="pf-title">Panel Sockets</div>
                             <div class="radio-group">
-                                <div class="radio-item" data-pf="panelSockets" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
-                                <div class="radio-item fail" data-pf="panelSockets" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
+                                <div class="radio-item" data-pf="panelSockets" data-val="PASS" onclick="selectPF(this)">✓ Pass</div>
+                                <div class="radio-item fail" data-pf="panelSockets" data-val="FAIL" onclick="selectPF(this)">✗ Fail</div>
                             </div>
                         </div>
                         <div class="pf-card"><div class="pf-title">Lights on Pack</div>
                             <div class="radio-group">
-                                <div class="radio-item" data-pf="lightsState" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
-                                <div class="radio-item fail" data-pf="lightsState" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
+                                <div class="radio-item" data-pf="lightsState" data-val="PASS" onclick="selectPF(this)">✓ Pass</div>
+                                <div class="radio-item fail" data-pf="lightsState" data-val="FAIL" onclick="selectPF(this)">✗ Fail</div>
                             </div>
                         </div>
                     </div>
-                    <div class="validation-msg" id="validation2">All visible tests must be completed before continuing.</div>
+                    <div class="validation-msg" id="validation2">All visible tests must be completed.</div>
                     <div class="navigation-buttons">
                         <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
                         <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
@@ -390,6 +389,7 @@ textarea { resize: vertical; min-height: 80px; }
                     <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
 
+                <!-- Page 3: Pack inspection -->
                 <div class="section-page" data-page="3">
                     <div class="section-title">Pack Inspection</div>
                     <div class="form-group"><label>Serial Number</label>
@@ -406,21 +406,22 @@ textarea { resize: vertical; min-height: 80px; }
                             </div>
                         </div>
                     </div>
+                    <div class="form-group"><label for="batteryDateCode">Battery Date Code <span class="sub-label">(e.g. CH240519)</span></label><input type="text" id="batteryDateCode" placeholder="e.g. CH240519" maxlength="8" style="text-transform:uppercase;"></div>
                     <div class="form-group"><label for="popDate">P.O.P. Date <span class="sub-label">(optional)</span></label><input type="date" id="popDate"></div>
                     <div class="form-group"><label>Battery Make</label>
                         <div class="radio-group three-col">
-                            <div class="radio-item" data-pf="batteryMake" data-val="BB22" onclick="selectPF(this)">BB22</div>
-                            <div class="radio-item" data-pf="batteryMake" data-val="BB24" onclick="selectPF(this)">BB24</div>
+                            <div class="radio-item" data-pf="batteryMake" data-val="BB 22AH" onclick="selectPF(this)">BB22</div>
+                            <div class="radio-item" data-pf="batteryMake" data-val="BB 24AH" onclick="selectPF(this)">BB24</div>
                             <div class="radio-item neutral" data-pf="batteryMake" data-val="NOT OURS" onclick="selectPF(this)">NOT OURS</div>
                         </div>
                     </div>
                     <div class="form-group"><label>Pack Test</label>
                         <div class="radio-group">
-                            <div class="radio-item" data-pf="packTest" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
-                            <div class="radio-item fail" data-pf="packTest" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
+                            <div class="radio-item" data-pf="packTest" data-val="PASS" onclick="selectPF(this)">✓ Pass</div>
+                            <div class="radio-item fail" data-pf="packTest" data-val="FAIL" onclick="selectPF(this)">✗ Fail</div>
                         </div>
                     </div>
-                    <div class="validation-msg" id="validation3">Serial number (5 digits), battery make, and pack test are all required.</div>
+                    <div class="validation-msg" id="validation3">Serial number (5 digits), battery make, and pack test are required.</div>
                     <div class="navigation-buttons">
                         <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
                         <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
@@ -428,15 +429,16 @@ textarea { resize: vertical; min-height: 80px; }
                     <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
 
+                <!-- Page 4: Category -->
                 <div class="section-page" data-page="4">
                     <div class="section-title">Repair Category</div>
                     <div class="form-group"><label>Category</label>
                         <div class="radio-group three-col">
-                            <div class="radio-item warranty" data-pf="category" data-val="WARRANTY" onclick="selectPF(this); toggleInvoiceField()">Warranty</div>
-                            <div class="radio-item paid" data-pf="category" data-val="PAID" onclick="selectPF(this); toggleInvoiceField()">Paid</div>
-                            <div class="radio-item goodwill" data-pf="category" data-val="GOODWILL" onclick="selectPF(this); toggleInvoiceField()">Goodwill</div>
+                            <div class="radio-item warranty" data-pf="category" data-val="WARRANTY" onclick="selectPF(this);toggleInvoiceField()">Warranty</div>
+                            <div class="radio-item paid" data-pf="category" data-val="PAID" onclick="selectPF(this);toggleInvoiceField()">Paid</div>
+                            <div class="radio-item goodwill" data-pf="category" data-val="GOODWILL" onclick="selectPF(this);toggleInvoiceField()">Goodwill</div>
                         </div>
-                        <div class="invoice-row" id="invoiceRow"><label for="invoiceNumber" style="margin-top: 18px;">Invoice Number</label><input type="text" id="invoiceNumber" placeholder="Enter invoice number"></div>
+                        <div class="invoice-row" id="invoiceRow"><label for="invoiceNumber" style="margin-top:18px;">Invoice Number</label><input type="text" id="invoiceNumber" placeholder="Enter invoice number"></div>
                     </div>
                     <div class="form-group"><label for="fedexTracking">Return Tracking Number <span class="sub-label">(optional)</span></label><input type="text" id="fedexTracking" placeholder="Enter return tracking number"></div>
                     <div class="validation-msg" id="validation4">Category required. Invoice number required for Paid repairs.</div>
@@ -447,6 +449,7 @@ textarea { resize: vertical; min-height: 80px; }
                     <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
 
+                <!-- Page 5: Parts -->
                 <div class="section-page" data-page="5">
                     <div class="section-title">Items Used in Repair</div>
                     <div class="form-group"><label>Tick all parts used:</label>
@@ -474,285 +477,220 @@ textarea { resize: vertical; min-height: 80px; }
     </div>
 </div>
 
+<!-- EMAIL EDIT MODAL -->
+<div id="emailModal" class="hidden">
+    <div class="modal-overlay" onclick="closeEmailModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <h3>Edit Email Before Sending</h3>
+            <div class="form-group"><label for="modalSubject">Subject</label><input type="text" id="modalSubject"></div>
+            <div class="form-group"><label for="modalBody">Email Body</label><textarea id="modalBody" style="min-height:250px;"></textarea></div>
+            <div class="modal-btns">
+                <button class="btn btn-previous" onclick="closeEmailModal()" style="flex:1;">Cancel</button>
+                <button class="btn btn-submit" onclick="sendEditedEmail()" style="flex:1;">Send Email</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // ============ CONFIG ============
 const SHEET_ID = '1iVCdZRmTXEfbV8_tmjomq7Cs8-za80yuW8z3QwpdXBk';
 const SERVICE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxZEMgdG1vfqT4L7HuGreb1_o8Ltrxmc5wIgYID4i_sghLa-Ey2TJhzi3Giz54qIlE10A/exec';
-const BOOKING_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxZEMgdG1vfqT4L7HuGreb1_o8Ltrxmc5wIgYID4i_sghLa-Ey2TJhzi3Giz54qIlE10A/exec';
 const IDEAL_POSTCODES_KEY = 'ak_mo77tj481BVZPetZv3QJe4xUSsEip';
 
-const MONTH_GIDS = {
-    1: null, 2: null, 3: null,
-    4: 21700818, 5: 257806692, 6: 199519344, 7: 0,
-    8: 2124425478, 9: 782015307, 10: 1786550392,
-    11: 330568521, 12: 1114698946
-};
+const MONTH_GIDS = { 1:null, 2:null, 3:null, 4:21700818, 5:257806692, 6:199519344, 7:0, 8:2124425478, 9:782015307, 10:1786550392, 11:330568521, 12:1114698946 };
 const MONTH_NAMES = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
 function getCurrentMonthGid() { return MONTH_GIDS[new Date().getMonth() + 1]; }
 function getCurrentMonthName() { return MONTH_NAMES[new Date().getMonth()]; }
 
 // ============ STATE ============
-let currentJobData = null;
-let currentPage = 1;
+let currentJobData = null, currentPage = 1, allJobs = [], currentJobs = [], expectedJobs = [], completedJobs = [];
+let activeTab = 'current', serialDigitsValue = '', bookingPackCount = 1, rebookPackCount = 1, nextJobNumber = '';
+let lastBookingData = null, lastUPSResult = null;
 const totalPages = 5;
-let allJobs = [], currentJobs = [], expectedJobs = [], completedJobs = [];
-let activeTab = 'current';
-let serialDigitsValue = '';
-let bookingPackCount = 1;
-let nextJobNumber = '';
 
-// ============ DATE HELPERS ============
+// ============ HELPERS ============
 function todayISO() { return new Date().toISOString().split('T')[0]; }
 function formatDateUK(iso) { if (!iso) return ''; const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; }
-function initReceivedDate() {
-    const iso = todayISO();
-    document.getElementById('receivedDate').value = iso;
-    document.getElementById('receivedDateDisplay').textContent = `Today (${formatDateUK(iso)})`;
-}
+function initReceivedDate() { const iso = todayISO(); document.getElementById('receivedDate').value = iso; document.getElementById('receivedDateDisplay').textContent = `Today (${formatDateUK(iso)})`; }
 function toggleDateEdit() {
-    const input = document.getElementById('receivedDate');
-    const display = document.getElementById('receivedDateDisplay');
-    if (input.classList.contains('hidden')) { input.classList.remove('hidden'); display.classList.add('hidden'); input.focus(); }
-    else {
-        input.classList.add('hidden'); display.classList.remove('hidden');
-        const iso = input.value || todayISO();
-        display.textContent = iso === todayISO() ? `Today (${formatDateUK(iso)})` : formatDateUK(iso);
-    }
+    const i = document.getElementById('receivedDate'), d = document.getElementById('receivedDateDisplay');
+    if (i.classList.contains('hidden')) { i.classList.remove('hidden'); d.classList.add('hidden'); i.focus(); }
+    else { i.classList.add('hidden'); d.classList.remove('hidden'); const iso = i.value||todayISO(); d.textContent = iso===todayISO() ? `Today (${formatDateUK(iso)})` : formatDateUK(iso); }
 }
 
-// ============ NUMPAD ============
-function updateSerialDisplay() {
-    const el = document.getElementById('serialDigits');
-    if (!serialDigitsValue.length) { el.textContent = '_____'; el.classList.add('empty'); }
-    else { el.textContent = serialDigitsValue + '_'.repeat(5 - serialDigitsValue.length); el.classList.remove('empty'); }
-}
+function updateSerialDisplay() { const el = document.getElementById('serialDigits'); if (!serialDigitsValue.length) { el.textContent='_____'; el.classList.add('empty'); } else { el.textContent = serialDigitsValue + '_'.repeat(5-serialDigitsValue.length); el.classList.remove('empty'); } }
 function numpad(d) { if (serialDigitsValue.length < 5) { serialDigitsValue += d; updateSerialDisplay(); } }
-function numpadBack() { serialDigitsValue = serialDigitsValue.slice(0, -1); updateSerialDisplay(); }
+function numpadBack() { serialDigitsValue = serialDigitsValue.slice(0,-1); updateSerialDisplay(); }
 function numpadClear() { serialDigitsValue = ''; updateSerialDisplay(); }
 
-// ============ CHECKBOX / RADIO ============
-function toggleCheckbox(id) {
-    const cb = document.getElementById(id);
-    cb.checked = !cb.checked;
-    cb.closest('.checkbox-item').classList.toggle('checked', cb.checked);
-}
-function selectPF(el) {
-    document.querySelectorAll(`[data-pf="${el.dataset.pf}"]`).forEach(n => n.classList.remove('checked'));
-    el.classList.add('checked');
-}
-function getPF(group) {
-    const sel = document.querySelector(`[data-pf="${group}"].checked`);
-    return sel ? sel.dataset.val : '';
-}
+function toggleCheckbox(id) { const cb = document.getElementById(id); cb.checked = !cb.checked; cb.closest('.checkbox-item').classList.toggle('checked', cb.checked); }
+function selectPF(el) { document.querySelectorAll(`[data-pf="${el.dataset.pf}"]`).forEach(n => n.classList.remove('checked')); el.classList.add('checked'); }
+function getPF(group) { const s = document.querySelector(`[data-pf="${group}"].checked`); return s ? s.dataset.val : ''; }
 function toggleInvoiceField() { document.getElementById('invoiceRow').classList.toggle('show', getPF('category') === 'PAID'); }
 
-// ============ PAGE NAV + VALIDATION (repair form) ============
-function updateProgress() {
-    document.getElementById('progressFill').style.width = (currentPage / totalPages * 100) + '%';
-    document.getElementById('progressText').textContent = `Step ${currentPage} of ${totalPages}`;
-}
+// ============ PAGE NAV ============
+function updateProgress() { document.getElementById('progressFill').style.width = (currentPage/totalPages*100)+'%'; document.getElementById('progressText').textContent = `Step ${currentPage} of ${totalPages}`; }
 function showPage(n) {
     document.querySelectorAll('.section-page').forEach(p => p.classList.remove('active'));
     document.querySelector(`.section-page[data-page="${n}"]`).classList.add('active');
-    currentPage = n; updateProgress(); window.scrollTo(0, 0);
+    currentPage = n; updateProgress(); window.scrollTo(0,0);
     document.querySelectorAll('.validation-msg').forEach(m => m.classList.remove('show'));
     if (n === 2) {
         const hc = document.getElementById('receivedCharger').checked, hl = document.getElementById('receivedLeads').checked;
-        document.getElementById('cardCharger').classList.toggle('disabled', !hc);
-        document.getElementById('cardCharger').style.pointerEvents = hc ? 'auto' : 'none';
-        document.getElementById('cardLeads').classList.toggle('disabled', !hl);
-        document.getElementById('cardLeads').style.pointerEvents = hl ? 'auto' : 'none';
+        document.getElementById('cardCharger').classList.toggle('disabled', !hc); document.getElementById('cardCharger').style.pointerEvents = hc ? 'auto' : 'none';
+        document.getElementById('cardLeads').classList.toggle('disabled', !hl); document.getElementById('cardLeads').style.pointerEvents = hl ? 'auto' : 'none';
     }
 }
 function validatePage(n) {
-    if (n === 1) return !!document.getElementById('receivedDate').value;
-    if (n === 2) {
-        const hc = document.getElementById('receivedCharger').checked, hl = document.getElementById('receivedLeads').checked;
-        if (hc && (!getPF('chargerTest') || !getPF('chargerType'))) return false;
-        if (hl && !getPF('leadsTest')) return false;
-        return getPF('panelSockets') && getPF('lightsState');
-    }
-    if (n === 3) return serialDigitsValue.length === 5 && getPF('batteryMake') && getPF('packTest');
-    if (n === 4) { const c = getPF('category'); return c && (c !== 'PAID' || document.getElementById('invoiceNumber').value.trim()); }
+    if (n===1) return !!document.getElementById('receivedDate').value;
+    if (n===2) { const hc=document.getElementById('receivedCharger').checked, hl=document.getElementById('receivedLeads').checked; if(hc&&(!getPF('chargerTest')||!getPF('chargerType'))) return false; if(hl&&!getPF('leadsTest')) return false; return getPF('panelSockets')&&getPF('lightsState'); }
+    if (n===3) return serialDigitsValue.length===5 && getPF('batteryMake') && getPF('packTest');
+    if (n===4) { const c=getPF('category'); return c && (c!=='PAID' || document.getElementById('invoiceNumber').value.trim()); }
     return true;
 }
-function nextPage() { if (!validatePage(currentPage)) { document.getElementById('validation' + currentPage).classList.add('show'); return; } if (currentPage < totalPages) showPage(currentPage + 1); }
-function previousPage() { if (currentPage > 1) showPage(currentPage - 1); }
+function nextPage() { if (!validatePage(currentPage)) { document.getElementById('validation'+currentPage).classList.add('show'); return; } if (currentPage<totalPages) showPage(currentPage+1); }
+function previousPage() { if (currentPage>1) showPage(currentPage-1); }
 
-// ============ JOB LOADING ============
-function parseCSV(text) {
-    const rows = []; let row = []; let field = ''; let q = false;
-    for (let i = 0; i < text.length; i++) {
-        const c = text[i], n = text[i + 1];
-        if (c === '"') { if (q && n === '"') { field += '"'; i++; } else q = !q; }
-        else if (c === ',' && !q) { row.push(field); field = ''; }
-        else if ((c === '\n' || c === '\r') && !q) { if (c === '\r' && n === '\n') i++; if (field || row.length) { row.push(field); rows.push(row); row = []; field = ''; } }
-        else field += c;
-    }
-    if (field || row.length) { row.push(field); rows.push(row); }
-    return rows;
-}
-function parseExpectedDate(s) { if (!s) return null; const m = s.match(/EXP\s*(\d{1,2})\/(\d{1,2})/i); return m ? new Date(new Date().getFullYear(), parseInt(m[2]) - 1, parseInt(m[1])) : null; }
-function parseDateFromSheet(s) {
-    if (!s) return null;
-    const d = new Date(s); if (!isNaN(d.getTime())) return d;
-    const p = s.split('/'); if (p.length === 3) { const dd = parseInt(p[0]), mm = parseInt(p[1]) - 1, yy = parseInt(p[2]); if (!isNaN(dd+mm+yy)) return new Date(yy, mm, dd); }
-    return null;
-}
-function getDateCategory(d) {
-    if (!d) return 'future'; const today = new Date(); today.setHours(0,0,0,0);
-    const tom = new Date(today); tom.setDate(tom.getDate() + 1);
-    const wk = new Date(today); wk.setDate(wk.getDate() + 7);
-    const ed = new Date(d); ed.setHours(0,0,0,0);
-    if (ed.getTime() === today.getTime()) return 'today'; if (ed.getTime() === tom.getTime()) return 'tomorrow'; if (ed <= wk) return 'soon'; return 'future';
-}
+// ============ CSV / DATE PARSING ============
+function parseCSV(text) { const rows=[]; let row=[],field='',q=false; for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1]; if(c==='"'){if(q&&n==='"'){field+='"';i++;}else q=!q;} else if(c===','&&!q){row.push(field);field='';} else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&n==='\n')i++;if(field||row.length){row.push(field);rows.push(row);row=[];field='';}} else field+=c;} if(field||row.length){row.push(field);rows.push(row);} return rows; }
+function parseExpectedDate(s) { if(!s) return null; const m=s.match(/EXP\s*(\d{1,2})\/(\d{1,2})/i); return m ? new Date(new Date().getFullYear(),parseInt(m[2])-1,parseInt(m[1])) : null; }
+function parseDateFromSheet(s) { if(!s) return null; const d=new Date(s); if(!isNaN(d.getTime())) return d; const p=s.split('/'); if(p.length===3){const dd=parseInt(p[0]),mm=parseInt(p[1])-1,yy=parseInt(p[2]);if(!isNaN(dd+mm+yy)) return new Date(yy,mm,dd);} return null; }
+function getDateCategory(d) { if(!d) return 'future'; const t=new Date();t.setHours(0,0,0,0); const tom=new Date(t);tom.setDate(tom.getDate()+1); const wk=new Date(t);wk.setDate(wk.getDate()+7); const ed=new Date(d);ed.setHours(0,0,0,0); if(ed.getTime()===t.getTime()) return 'today'; if(ed.getTime()===tom.getTime()) return 'tomorrow'; if(ed<=wk) return 'soon'; return 'future'; }
 
-let cachedRows = []; // store raw CSV rows for job number generation
+let cachedRows = [];
 
 async function loadJobs() {
     try {
-        const gid = getCurrentMonthGid(); const month = getCurrentMonthName();
-        if (gid === null) { document.getElementById('loadingJobs').innerHTML = `<div class="error-message">No GID configured for ${month}.</div>`; return; }
-        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
-        const res = await fetch(url); const text = await res.text();
-        const allRows = parseCSV(text);
-        cachedRows = allRows; // store for job number generation
-        const rows = allRows.slice(1);
-
+        const gid = getCurrentMonthGid(), month = getCurrentMonthName();
+        if (gid===null) { document.getElementById('loadingJobs').innerHTML=`<div class="error-message">No GID for ${month}.</div>`; return; }
+        const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`);
+        const text = await res.text(); const allRows = parseCSV(text); cachedRows = allRows; const rows = allRows.slice(1);
         document.getElementById('loadingJobs').classList.add('hidden');
         document.getElementById('currentMonthDisplay').textContent = `Viewing: ${month} ${new Date().getFullYear()}`;
         const today = new Date(); today.setHours(0,0,0,0);
-        const all = rows.map((r, i) => ({ jobNumber: r[0]||'', customerName: r[5]||'', customerAddress: r[6]||'', packReceived: r[4]||'', serialNumber: r[13]||'', rowIndex: i + 2 }));
-
-        const exp = [], arr = [], comp = [];
+        const all = rows.map((r,i) => ({jobNumber:r[0]||'',customerName:r[5]||'',customerAddress:r[6]||'',packReceived:r[4]||'',serialNumber:r[13]||'',rowIndex:i+2}));
+        const exp=[],arr=[],comp=[];
         all.forEach(row => {
-            if (!row.packReceived) return;
-            const hasSerial = row.serialNumber && row.serialNumber.trim() !== '';
-            if (String(row.packReceived).toUpperCase().startsWith('EXP')) {
-                const ed = parseExpectedDate(row.packReceived);
-                if (ed && ed <= today) { if (hasSerial) comp.push({...row, type:'completed'}); else arr.push({...row, receivedDate: ed, type:'current'}); }
-                else exp.push({...row, expectedDate: ed, type:'expected'});
-            } else { if (hasSerial) comp.push({...row, type:'completed'}); else arr.push({...row, receivedDate: parseDateFromSheet(row.packReceived), type:'current'}); }
+            if(!row.packReceived) return;
+            const hasSerial = row.serialNumber && row.serialNumber.trim()!=='';
+            if(String(row.packReceived).toUpperCase().startsWith('EXP')) {
+                const ed=parseExpectedDate(row.packReceived);
+                if(ed&&ed<=today){if(hasSerial) comp.push({...row,type:'completed'}); else arr.push({...row,receivedDate:ed,type:'current'});}
+                else exp.push({...row,expectedDate:ed,type:'expected'});
+            } else { if(hasSerial) comp.push({...row,type:'completed'}); else arr.push({...row,receivedDate:parseDateFromSheet(row.packReceived),type:'current'}); }
         });
-        expectedJobs = exp.sort((a,b) => (a.expectedDate&&b.expectedDate) ? a.expectedDate-b.expectedDate : 0);
-        currentJobs = arr.sort((a,b) => a.jobNumber.localeCompare(b.jobNumber));
-        completedJobs = comp.sort((a,b) => b.jobNumber.localeCompare(a.jobNumber));
-        allJobs = [...currentJobs, ...expectedJobs, ...completedJobs];
-
-        document.getElementById('currentCount').textContent = currentJobs.length;
-        document.getElementById('expectedCount').textContent = expectedJobs.length;
-        document.getElementById('completedCount').textContent = completedJobs.length;
-        const due = currentJobs.filter(j => { if (!j.receivedDate) return false; const rd = new Date(j.receivedDate); rd.setHours(0,0,0,0); return rd.getTime() === today.getTime(); }).length;
-        document.getElementById('statToday').textContent = due;
-        document.getElementById('statCurrent').textContent = currentJobs.length;
-        document.getElementById('statCompleted').textContent = completedJobs.length;
+        expectedJobs=exp.sort((a,b)=>(a.expectedDate&&b.expectedDate)?a.expectedDate-b.expectedDate:0);
+        currentJobs=arr.sort((a,b)=>a.jobNumber.localeCompare(b.jobNumber));
+        completedJobs=comp.sort((a,b)=>b.jobNumber.localeCompare(a.jobNumber));
+        allJobs=[...currentJobs,...expectedJobs,...completedJobs];
+        document.getElementById('currentCount').textContent=currentJobs.length;
+        document.getElementById('expectedCount').textContent=expectedJobs.length;
+        document.getElementById('completedCount').textContent=completedJobs.length;
+        const due=currentJobs.filter(j=>{if(!j.receivedDate)return false;const rd=new Date(j.receivedDate);rd.setHours(0,0,0,0);return rd.getTime()===today.getTime();}).length;
+        document.getElementById('statToday').textContent=due;
+        document.getElementById('statCurrent').textContent=currentJobs.length;
+        document.getElementById('statCompleted').textContent=completedJobs.length;
         showTodayJobs();
-
-        // Generate next job number from loaded data
         generateNextJobNumber();
-    } catch (err) { console.error(err); document.getElementById('loadingJobs').innerHTML = '<div class="error-message">Error loading jobs. Refresh the page.</div>'; }
+    } catch(err) { console.error(err); document.getElementById('loadingJobs').innerHTML='<div class="error-message">Error loading jobs. Refresh the page.</div>'; }
 }
 
-// ============ JOB NUMBER GENERATION ============
 function generateNextJobNumber() {
-    const now = new Date();
-    const mm = String(now.getMonth() + 1).padStart(2, '0'); // 04, 05, ..., 12
-    const prefix = 'S' + mm;
-
-    // Find highest sequence number for current month
+    const mm = String(new Date().getMonth()+1).padStart(2,'0');
+    const prefix = 'S'+mm;
     let maxSeq = 0;
     cachedRows.forEach(row => {
-        const job = (row[0] || '').trim().toUpperCase();
-        if (job.startsWith(prefix.toUpperCase())) {
-            const seqStr = job.substring(prefix.length);
+        const job = (row[0]||'').trim().toUpperCase();
+        // Handle multi-pack job numbers like S0432 #1
+        const baseJob = job.split('#')[0].trim();
+        if (baseJob.startsWith(prefix.toUpperCase())) {
+            const seqStr = baseJob.substring(prefix.length);
             const seq = parseInt(seqStr);
             if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
         }
     });
-
-    const nextSeq = maxSeq + 1;
-    // Pad to at least 2 digits, but allow 3+ if past 99
-    const seqStr = nextSeq < 100 ? String(nextSeq).padStart(2, '0') : String(nextSeq);
-    nextJobNumber = prefix + seqStr;
+    const next = maxSeq + 1;
+    nextJobNumber = prefix + (next < 100 ? String(next).padStart(2,'0') : String(next));
 }
 
 // ============ DISPLAY FUNCTIONS ============
 function showJobTab(tab) {
-    activeTab = tab;
-    document.getElementById('tabCurrent').classList.toggle('active', tab === 'current');
-    document.getElementById('tabExpected').classList.toggle('active', tab === 'expected');
-    document.getElementById('tabCompleted').classList.toggle('active', tab === 'completed');
-    document.getElementById('dateFilter').value = ''; document.getElementById('searchJob').value = '';
-    if (tab === 'current') displayJobs(currentJobs); else if (tab === 'expected') displayExpectedJobs(expectedJobs); else displayCompletedJobs(completedJobs);
+    activeTab=tab;
+    document.getElementById('tabCurrent').classList.toggle('active',tab==='current');
+    document.getElementById('tabExpected').classList.toggle('active',tab==='expected');
+    document.getElementById('tabCompleted').classList.toggle('active',tab==='completed');
+    document.getElementById('dateFilter').value=''; document.getElementById('searchJob').value='';
+    if(tab==='current') displayJobs(currentJobs); else if(tab==='expected') displayExpectedJobs(expectedJobs); else displayCompletedJobs(completedJobs);
 }
 function displayJobs(jobs) {
-    const list = document.getElementById('jobList'), count = document.getElementById('jobCount');
-    list.innerHTML = ''; if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No jobs found.</p>'; count.textContent=''; return; }
-    count.textContent = `Showing ${jobs.length} job${jobs.length !== 1 ? 's' : ''}`;
-    const today = new Date(); today.setHours(0,0,0,0);
-    jobs.forEach(job => {
-        let cls = '', label = '';
-        if (job.receivedDate) { const rd = new Date(job.receivedDate); rd.setHours(0,0,0,0); if (rd.getTime() === today.getTime()) { cls = 'repair-today'; label = '📦 DUE TODAY'; } }
-        const card = document.createElement('div'); card.className = 'job-card ' + cls;
-        card.innerHTML = `<div class="job-card-number">${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div><div style="font-size:14px;color:#999;margin-top:5px;">${job.packReceived ? 'Due: ' + job.packReceived : ''}</div>${label ? `<div style="font-weight:700;margin-top:8px;color:#155724;background:#d4edda;padding:8px;border-radius:6px;text-align:center;">${label}</div>` : ''}`;
-        card.onclick = () => selectJob(job); list.appendChild(card);
+    const list=document.getElementById('jobList'),count=document.getElementById('jobCount');
+    list.innerHTML=''; if(!jobs.length){list.innerHTML='<p style="text-align:center;color:#666;">No jobs found.</p>';count.textContent='';return;}
+    count.textContent=`Showing ${jobs.length} job${jobs.length!==1?'s':''}`;
+    const today=new Date();today.setHours(0,0,0,0);
+    jobs.forEach(job=>{
+        let cls='',label='';
+        if(job.receivedDate){const rd=new Date(job.receivedDate);rd.setHours(0,0,0,0);if(rd.getTime()===today.getTime()){cls='repair-today';label='📦 DUE TODAY';}}
+        const card=document.createElement('div');card.className='job-card '+cls;
+        card.innerHTML=`<div class="job-card-number">${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress?' — '+job.customerAddress:''}</div><div style="font-size:14px;color:#999;margin-top:5px;">${job.packReceived?'Due: '+job.packReceived:''}</div>${label?`<div style="font-weight:700;margin-top:8px;color:#155724;background:#d4edda;padding:8px;border-radius:6px;text-align:center;">${label}</div>`:''}`;
+        card.onclick=()=>selectJob(job);list.appendChild(card);
     });
 }
 function displayExpectedJobs(jobs) {
-    const list = document.getElementById('jobList'), count = document.getElementById('jobCount');
-    list.innerHTML = ''; if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No expected arrivals.</p>'; count.textContent=''; return; }
-    count.textContent = `Showing ${jobs.length} expected arrival${jobs.length !== 1 ? 's' : ''}`;
-    jobs.forEach(job => {
-        const cat = getDateCategory(job.expectedDate); let cls = '', label = '';
-        if (cat === 'today') { cls = 'expected-today'; label = '📦 Arriving TODAY'; } else if (cat === 'tomorrow') { cls = 'expected-tomorrow'; label = '📅 Arriving TOMORROW'; } else if (cat === 'soon') { cls = 'expected-soon'; label = '🔜 Arriving This Week'; }
-        const card = document.createElement('div'); card.className = 'job-card ' + cls; card.style.cursor = 'default';
-        card.innerHTML = `<div class="job-card-number">${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div><div style="font-size:14px;color:#666;margin-top:5px;">Expected: ${job.packReceived}</div>${label ? `<div style="font-weight:600;margin-top:8px;color:#333;">${label}</div>` : ''}`;
+    const list=document.getElementById('jobList'),count=document.getElementById('jobCount');
+    list.innerHTML=''; if(!jobs.length){list.innerHTML='<p style="text-align:center;color:#666;">No expected arrivals.</p>';count.textContent='';return;}
+    count.textContent=`Showing ${jobs.length} expected arrival${jobs.length!==1?'s':''}`;
+    jobs.forEach(job=>{
+        const cat=getDateCategory(job.expectedDate);let cls='',label='';
+        if(cat==='today'){cls='expected-today';label='📦 Arriving TODAY';}else if(cat==='tomorrow'){cls='expected-tomorrow';label='📅 Arriving TOMORROW';}else if(cat==='soon'){cls='expected-soon';label='🔜 Arriving This Week';}
+        const card=document.createElement('div');card.className='job-card '+cls;card.style.cursor='default';
+        card.innerHTML=`<div class="job-card-number">${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress?' — '+job.customerAddress:''}</div><div style="font-size:14px;color:#666;margin-top:5px;">Expected: ${job.packReceived}</div>${label?`<div style="font-weight:600;margin-top:8px;color:#333;">${label}</div>`:''}`;
         list.appendChild(card);
     });
 }
 function displayCompletedJobs(jobs) {
-    const list = document.getElementById('jobList'), count = document.getElementById('jobCount');
-    list.innerHTML = ''; if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No completed repairs yet.</p>'; count.textContent=''; return; }
-    count.textContent = `Showing ${jobs.length} completed repair${jobs.length !== 1 ? 's' : ''}`;
-    jobs.forEach(job => {
-        const card = document.createElement('div'); card.className = 'job-card repair-completed';
-        card.innerHTML = `<div class="job-card-number">✓ ${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div><div style="font-size:14px;color:#999;margin-top:5px;">Serial: ${job.serialNumber}</div><div style="font-size:14px;color:#28a745;margin-top:5px;font-weight:600;">COMPLETED</div>`;
-        card.onclick = () => selectJob(job); list.appendChild(card);
+    const list=document.getElementById('jobList'),count=document.getElementById('jobCount');
+    list.innerHTML=''; if(!jobs.length){list.innerHTML='<p style="text-align:center;color:#666;">No completed repairs.</p>';count.textContent='';return;}
+    count.textContent=`Showing ${jobs.length} completed repair${jobs.length!==1?'s':''}`;
+    jobs.forEach(job=>{
+        const card=document.createElement('div');card.className='job-card repair-completed';
+        card.innerHTML=`<div class="job-card-number">✓ ${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress?' — '+job.customerAddress:''}</div><div style="font-size:14px;color:#999;margin-top:5px;">Serial: ${job.serialNumber}</div><div style="font-size:14px;color:#28a745;margin-top:5px;font-weight:600;">COMPLETED</div>`;
+        card.onclick=()=>selectJob(job);list.appendChild(card);
     });
 }
 function filterJobs() {
-    const df = document.getElementById('dateFilter').value, st = document.getElementById('searchJob').value.toUpperCase().trim();
-    let list = activeTab === 'current' ? currentJobs : activeTab === 'expected' ? expectedJobs : completedJobs;
-    if (st) list = list.filter(j => j.jobNumber.toUpperCase().includes(st));
-    if (df && activeTab === 'current') list = list.filter(j => { const pd = parseDateFromSheet(j.packReceived); return pd && pd.toDateString() === new Date(df).toDateString(); });
-    if (activeTab === 'current') displayJobs(list); else if (activeTab === 'expected') displayExpectedJobs(list); else displayCompletedJobs(list);
+    const df=document.getElementById('dateFilter').value,st=document.getElementById('searchJob').value.toUpperCase().trim();
+    let list=activeTab==='current'?currentJobs:activeTab==='expected'?expectedJobs:completedJobs;
+    if(st) list=list.filter(j=>j.jobNumber.toUpperCase().includes(st));
+    if(df&&activeTab==='current') list=list.filter(j=>{const pd=parseDateFromSheet(j.packReceived);return pd&&pd.toDateString()===new Date(df).toDateString();});
+    if(activeTab==='current') displayJobs(list); else if(activeTab==='expected') displayExpectedJobs(list); else displayCompletedJobs(list);
 }
-function showAllJobs() { document.getElementById('dateFilter').value = ''; document.getElementById('searchJob').value = ''; showJobTab(activeTab); }
+function showAllJobs() { document.getElementById('dateFilter').value=''; document.getElementById('searchJob').value=''; showJobTab(activeTab); }
 function showTodayJobs() { showJobTab('current'); }
 
-// ============ REPAIR FORM: SELECT / RESET / SUBMIT ============
+// ============ REPAIR FORM ============
 function selectJob(job) {
-    currentJobData = job;
-    document.getElementById('currentJobNumber').textContent = job.jobNumber;
-    document.getElementById('currentCustomerName').textContent = job.customerName;
-    document.getElementById('currentCustomerAddress').textContent = job.customerAddress || '';
+    currentJobData=job;
+    document.getElementById('currentJobNumber').textContent=job.jobNumber;
+    document.getElementById('currentCustomerName').textContent=job.customerName;
+    document.getElementById('currentCustomerAddress').textContent=job.customerAddress||'';
     document.getElementById('jobSelector').classList.add('hidden');
     document.getElementById('repairForm').classList.remove('hidden');
     resetForm(); initReceivedDate();
-    const hasDraft = loadDraft(job.jobNumber);
-    if (!hasDraft) showPage(1);
-    window.scrollTo(0, 0);
+    const hasDraft=loadDraft(job.jobNumber);
+    if(!hasDraft) showPage(1);
+    window.scrollTo(0,0);
 }
 function resetForm() {
     document.getElementById('mainForm').reset();
-    document.querySelectorAll('.checkbox-item.checked').forEach(i => i.classList.remove('checked'));
-    document.querySelectorAll('.radio-item.checked').forEach(i => i.classList.remove('checked'));
-    document.querySelectorAll('.validation-msg').forEach(m => m.classList.remove('show'));
+    document.querySelectorAll('.checkbox-item.checked').forEach(i=>i.classList.remove('checked'));
+    document.querySelectorAll('#repairForm .radio-item.checked').forEach(i=>i.classList.remove('checked'));
+    document.querySelectorAll('.validation-msg').forEach(m=>m.classList.remove('show'));
     document.getElementById('successMessage').classList.add('hidden');
     document.getElementById('errorMessage').classList.add('hidden');
     document.getElementById('invoiceRow').classList.remove('show');
-    serialDigitsValue = ''; updateSerialDisplay();
-    document.getElementById('receivedPack').checked = true;
+    serialDigitsValue=''; updateSerialDisplay();
+    document.getElementById('receivedPack').checked=true;
     document.querySelector('#receivedPack').closest('.checkbox-item').classList.add('checked');
 }
 function backToJobSelector() {
@@ -761,58 +699,59 @@ function backToJobSelector() {
     resetForm(); showPage(1);
 }
 function collectFormData() {
-    const hc = document.getElementById('receivedCharger').checked, hl = document.getElementById('receivedLeads').checked;
-    const partIds = ['partCircuitBoard','partFrontCase','partRearCase','partNegSocket','partPosSocket','partCigLighter','partDCSocket','partTestButton','partM2M','partNewPack'];
-    const partKeys = ['circuitBoard','frontCase','rearCase','negSocket','posSocket','cigLighter','dcSocket','testButton','m2m','newPack'];
-    const parts = {}; partIds.forEach((id, i) => parts[partKeys[i]] = document.getElementById(id).checked);
-    const cat = getPF('category');
+    const hc=document.getElementById('receivedCharger').checked, hl=document.getElementById('receivedLeads').checked;
+    const partIds=['partCircuitBoard','partFrontCase','partRearCase','partNegSocket','partPosSocket','partCigLighter','partDCSocket','partTestButton','partM2M','partNewPack'];
+    const partKeys=['circuitBoard','frontCase','rearCase','negSocket','posSocket','cigLighter','dcSocket','testButton','m2m','newPack'];
+    const parts={}; partIds.forEach((id,i)=>parts[partKeys[i]]=document.getElementById(id).checked);
+    const cat=getPF('category');
     return {
-        action: 'repair',
-        jobNumber: currentJobData.jobNumber,
-        receivedDate: document.getElementById('receivedDate').value,
-        popDate: document.getElementById('popDate').value,
-        serialNumber: document.getElementById('serialPrefix').value + serialDigitsValue,
-        batteryMake: getPF('batteryMake'), packTest: getPF('packTest'),
-        chargerReceived: hc, chargerType: hc ? getPF('chargerType') : 'NONE', chargerTest: hc ? getPF('chargerTest') : '',
-        leadsReceived: hl, clampsReceived: hl ? 'BOTH' : 'NONE', leadsTest: hl ? getPF('leadsTest') : 'NONE',
-        category: cat, invoiceNumber: cat === 'PAID' ? document.getElementById('invoiceNumber').value : '',
-        dateReturned: todayISO(), returnTracking: document.getElementById('fedexTracking').value,
-        panelSockets: getPF('panelSockets'), lightsState: getPF('lightsState'), parts
+        action:'repair', jobNumber:currentJobData.jobNumber,
+        receivedDate:document.getElementById('receivedDate').value,
+        popDate:document.getElementById('popDate').value,
+        serialNumber:document.getElementById('serialPrefix').value+serialDigitsValue,
+        batteryDateCode:document.getElementById('batteryDateCode').value.toUpperCase(),
+        batteryMake:getPF('batteryMake'), packTest:getPF('packTest'),
+        chargerReceived:hc, chargerType:hc?getPF('chargerType'):'NONE', chargerTest:hc?getPF('chargerTest'):'',
+        leadsReceived:hl, clampsReceived:hl?'BOTH':'NONE', leadsTest:hl?getPF('leadsTest'):'NONE',
+        category:cat, invoiceNumber:cat==='PAID'?document.getElementById('invoiceNumber').value:'',
+        dateReturned:todayISO(), returnTracking:document.getElementById('fedexTracking').value,
+        panelSockets:getPF('panelSockets'), lightsState:getPF('lightsState'), parts
     };
 }
 function submitForm() {
-    if (!SERVICE_SCRIPT_URL) { alert('⚠️ Apps Script URL not configured yet.'); return; }
-    const data = collectFormData(); const btn = document.querySelector('.btn-submit'); const orig = btn.textContent;
-    btn.textContent = 'Saving...'; btn.disabled = true;
-    fetch(SERVICE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(data) })
-    .then(() => { document.getElementById('successMessage').classList.remove('hidden'); deleteDraft(data.jobNumber); window.scrollTo(0,0); alert('Repair record saved!'); btn.textContent = orig; btn.disabled = false; setTimeout(() => { backToJobSelector(); loadJobs(); }, 1500); })
-    .catch(err => { document.getElementById('errorMessage').textContent = 'Error: ' + err.message; document.getElementById('errorMessage').classList.remove('hidden'); btn.textContent = orig; btn.disabled = false; window.scrollTo(0,0); });
+    if(!SERVICE_SCRIPT_URL){alert('⚠️ Apps Script URL not configured.');return;}
+    const data=collectFormData(); const btn=document.querySelector('.btn-submit'); const orig=btn.textContent;
+    btn.textContent='Saving...'; btn.disabled=true;
+    fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(data)})
+    .then(()=>{document.getElementById('successMessage').classList.remove('hidden');deleteDraft(data.jobNumber);window.scrollTo(0,0);alert('Repair record saved!');btn.textContent=orig;btn.disabled=false;setTimeout(()=>{backToJobSelector();loadJobs();},1500);})
+    .catch(err=>{document.getElementById('errorMessage').textContent='Error: '+err.message;document.getElementById('errorMessage').classList.remove('hidden');btn.textContent=orig;btn.disabled=false;window.scrollTo(0,0);});
 }
 
 // ============ DRAFTS ============
 function saveDraft() {
-    if (!currentJobData) return;
-    localStorage.setItem(`draft_${currentJobData.jobNumber}`, JSON.stringify({ jobNumber: currentJobData.jobNumber, currentPage, formData: collectFormData(), serialDigitsValue, timestamp: new Date().toISOString() }));
+    if(!currentJobData) return;
+    localStorage.setItem(`draft_${currentJobData.jobNumber}`,JSON.stringify({jobNumber:currentJobData.jobNumber,currentPage,formData:collectFormData(),serialDigitsValue,timestamp:new Date().toISOString()}));
     alert('✅ Draft saved!'); backToJobSelector();
 }
-function loadDraft(jobNumber) {
-    const raw = localStorage.getItem(`draft_${jobNumber}`); if (!raw) return false;
-    const d = JSON.parse(raw);
-    if (!confirm(`📋 Draft found from ${new Date(d.timestamp).toLocaleString()}\n\nResume?`)) return false;
-    restoreFormData(d.formData, d.serialDigitsValue || ''); showPage(d.currentPage); return true;
+function loadDraft(jn) {
+    const raw=localStorage.getItem(`draft_${jn}`); if(!raw) return false;
+    const d=JSON.parse(raw);
+    if(!confirm(`📋 Draft from ${new Date(d.timestamp).toLocaleString()}\n\nResume?`)) return false;
+    restoreFormData(d.formData,d.serialDigitsValue||''); showPage(d.currentPage); return true;
 }
 function deleteDraft(jn) { localStorage.removeItem(`draft_${jn}`); }
-function restoreFormData(d, serial) {
-    if (d.receivedDate) { document.getElementById('receivedDate').value = d.receivedDate; document.getElementById('receivedDateDisplay').textContent = d.receivedDate === todayISO() ? `Today (${formatDateUK(d.receivedDate)})` : formatDateUK(d.receivedDate); }
-    const ticks = { receivedPack: true, receivedLeads: !!d.leadsReceived, receivedCharger: !!d.chargerReceived };
-    Object.entries(ticks).forEach(([id, v]) => { const cb = document.getElementById(id); cb.checked = v; cb.closest('.checkbox-item').classList.toggle('checked', v); });
-    [['chargerTest',d.chargerTest],['chargerType',d.chargerType],['leadsTest',d.leadsTest],['panelSockets',d.panelSockets],['lightsState',d.lightsState],['batteryMake',d.batteryMake],['packTest',d.packTest],['category',d.category]].forEach(([g,v]) => { if (!v||v==='NONE') return; const el = document.querySelector(`[data-pf="${g}"][data-val="${v}"]`); if (el) selectPF(el); });
-    if (d.serialNumber) { const pfx = d.serialNumber.startsWith('DZ1H') ? 'DZ1H' : 'NA'; document.getElementById('serialPrefix').value = pfx; serialDigitsValue = serial || d.serialNumber.substring(pfx.length); updateSerialDisplay(); }
-    if (d.popDate) document.getElementById('popDate').value = d.popDate;
-    if (d.invoiceNumber) document.getElementById('invoiceNumber').value = d.invoiceNumber;
-    if (d.returnTracking) document.getElementById('fedexTracking').value = d.returnTracking;
+function restoreFormData(d,serial) {
+    if(d.receivedDate){document.getElementById('receivedDate').value=d.receivedDate;document.getElementById('receivedDateDisplay').textContent=d.receivedDate===todayISO()?`Today (${formatDateUK(d.receivedDate)})`:formatDateUK(d.receivedDate);}
+    const ticks={receivedPack:true,receivedLeads:!!d.leadsReceived,receivedCharger:!!d.chargerReceived};
+    Object.entries(ticks).forEach(([id,v])=>{const cb=document.getElementById(id);cb.checked=v;cb.closest('.checkbox-item').classList.toggle('checked',v);});
+    [['chargerTest',d.chargerTest],['chargerType',d.chargerType],['leadsTest',d.leadsTest],['panelSockets',d.panelSockets],['lightsState',d.lightsState],['batteryMake',d.batteryMake],['packTest',d.packTest],['category',d.category]].forEach(([g,v])=>{if(!v||v==='NONE')return;const el=document.querySelector(`[data-pf="${g}"][data-val="${v}"]`);if(el)selectPF(el);});
+    if(d.serialNumber){const pfx=d.serialNumber.startsWith('DZ1H')?'DZ1H':'NA';document.getElementById('serialPrefix').value=pfx;serialDigitsValue=serial||d.serialNumber.substring(pfx.length);updateSerialDisplay();}
+    if(d.batteryDateCode) document.getElementById('batteryDateCode').value=d.batteryDateCode;
+    if(d.popDate) document.getElementById('popDate').value=d.popDate;
+    if(d.invoiceNumber) document.getElementById('invoiceNumber').value=d.invoiceNumber;
+    if(d.returnTracking) document.getElementById('fedexTracking').value=d.returnTracking;
     toggleInvoiceField();
-    if (d.parts) { const map = {circuitBoard:'partCircuitBoard',frontCase:'partFrontCase',rearCase:'partRearCase',negSocket:'partNegSocket',posSocket:'partPosSocket',cigLighter:'partCigLighter',dcSocket:'partDCSocket',testButton:'partTestButton',m2m:'partM2M',newPack:'partNewPack'}; Object.entries(d.parts).forEach(([k,v]) => { const id = map[k]; if (!id) return; const cb = document.getElementById(id); cb.checked = !!v; cb.closest('.checkbox-item').classList.toggle('checked', !!v); }); }
+    if(d.parts){const map={circuitBoard:'partCircuitBoard',frontCase:'partFrontCase',rearCase:'partRearCase',negSocket:'partNegSocket',posSocket:'partPosSocket',cigLighter:'partCigLighter',dcSocket:'partDCSocket',testButton:'partTestButton',m2m:'partM2M',newPack:'partNewPack'};Object.entries(d.parts).forEach(([k,v])=>{const id=map[k];if(!id)return;const cb=document.getElementById(id);cb.checked=!!v;cb.closest('.checkbox-item').classList.toggle('checked',!!v);});}
 }
 
 // ============ BOOKING PORTAL ============
@@ -823,171 +762,245 @@ function openBookingPortal() {
     document.getElementById('bookingCallDate').textContent = formatDateUK(todayISO());
     document.getElementById('bookingSuccess').classList.add('hidden');
     document.getElementById('bookingError').classList.add('hidden');
+    document.getElementById('upsResults').classList.add('hidden');
     document.getElementById('bookingValidation').classList.remove('show');
-    // Reset form fields
-    ['bkCustomerName','bkPostcode','bkAddress','bkPostcodeFinal','bkPhone','bkEmail','bkFault'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('bkPickupDate').value = '';
+    ['bkCustomerName','bkPostcode','bkAddress','bkPostcodeFinal','bkPhone','bkEmail','bkFault'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('bkPickupDate').value='';
     document.getElementById('addressResults').classList.add('hidden');
-    bookingPackCount = 1;
-    document.querySelectorAll('.pack-count-btn').forEach(b => b.classList.toggle('selected', b.dataset.packs === '1'));
-    document.getElementById('packWeightDisplay').textContent = 'Shipment weight: 10 kg';
-    window.scrollTo(0, 0);
+    bookingPackCount=1;
+    document.querySelectorAll('#bookingPortal .pack-count-btn').forEach(b=>b.classList.toggle('selected',b.dataset.packs==='1'));
+    document.getElementById('packWeightDisplay').textContent='Shipment weight: 10 kg';
+    document.getElementById('bookingSubmitBtn').textContent='Book Repair, Generate Label & Schedule Pickup';
+    document.getElementById('bookingSubmitBtn').disabled=false;
+    lastBookingData=null; lastUPSResult=null;
+    window.scrollTo(0,0);
 }
+function closeBookingPortal() { document.getElementById('bookingPortal').classList.add('hidden'); document.getElementById('jobSelector').classList.remove('hidden'); }
 
-function closeBookingPortal() {
-    document.getElementById('bookingPortal').classList.add('hidden');
-    document.getElementById('jobSelector').classList.remove('hidden');
-}
-
-// Pack count selector
 function selectPackCount(el) {
-    document.querySelectorAll('.pack-count-btn').forEach(b => b.classList.remove('selected'));
+    el.closest('.pack-count-row').querySelectorAll('.pack-count-btn').forEach(b=>b.classList.remove('selected'));
     el.classList.add('selected');
-    bookingPackCount = parseInt(el.dataset.packs);
-    document.getElementById('packWeightDisplay').textContent = `Shipment weight: ${bookingPackCount * 10} kg`;
+    bookingPackCount=parseInt(el.dataset.packs);
+    document.getElementById('packWeightDisplay').textContent=`Shipment weight: ${bookingPackCount*10} kg`;
 }
 
-// Email suffix quick-tap
 function appendEmailSuffix(suffix) {
-    const input = document.getElementById('bkEmail');
-    const val = input.value.trim();
-    // If there's already an @, replace everything from @ onwards
-    const atIndex = val.indexOf('@');
-    if (atIndex >= 0) {
-        input.value = val.substring(0, atIndex) + suffix;
-    } else {
-        input.value = val + suffix;
-    }
+    const input=document.getElementById('bkEmail'); const val=input.value.trim();
+    const at=val.indexOf('@');
+    input.value = at>=0 ? val.substring(0,at)+suffix : val+suffix;
     input.focus();
 }
 
-// ============ POSTCODE LOOKUP (Ideal Postcodes) ============
+// ============ POSTCODE LOOKUP ============
 async function lookupPostcode() {
-    const postcode = document.getElementById('bkPostcode').value.trim();
-    if (!postcode) { alert('Please enter a postcode.'); return; }
-
-    if (!IDEAL_POSTCODES_KEY) {
-        alert('⚠️ Ideal Postcodes API key not configured.\n\nYou can still type the address manually.');
-        document.getElementById('bkPostcodeFinal').value = postcode.toUpperCase();
-        return;
-    }
-
+    const postcode=document.getElementById('bkPostcode').value.trim();
+    if(!postcode){alert('Please enter a postcode.');return;}
+    if(!IDEAL_POSTCODES_KEY){document.getElementById('bkPostcodeFinal').value=postcode.toUpperCase();return;}
     try {
-        const url = `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodeURIComponent(postcode)}?api_key=${IDEAL_POSTCODES_KEY}`;
-        const res = await fetch(url);
-        const data = await res.json();
-
-        if (data.code === 4040) {
-            alert('Postcode not found. Please check and try again.');
-            return;
-        }
-        if (data.code === 4010 || data.code === 4020) {
-            alert('API key issue. Please check your Ideal Postcodes key.');
-            return;
-        }
-        if (data.code !== 2000 || !data.result || !data.result.length) {
-            alert('No addresses found for this postcode. Please enter address manually.');
-            return;
-        }
-
-        const select = document.getElementById('addressSelect');
-        select.innerHTML = '<option value="">— Select an address —</option>';
-
-        data.result.forEach((addr, i) => {
-            const parts = [addr.line_1, addr.line_2, addr.line_3, addr.post_town, addr.county].filter(p => p && p.trim());
-            const fullAddr = parts.join(', ');
-            const opt = document.createElement('option');
-            opt.value = i;
-            opt.textContent = fullAddr;
-            opt.dataset.address = fullAddr;
+        const res=await fetch(`https://api.ideal-postcodes.co.uk/v1/postcodes/${encodeURIComponent(postcode)}?api_key=${IDEAL_POSTCODES_KEY}`);
+        const data=await res.json();
+        if(data.code===4040){alert('Postcode not found.');return;}
+        if(data.code!==2000||!data.result||!data.result.length){alert('No addresses found.');return;}
+        const select=document.getElementById('addressSelect');
+        select.innerHTML='<option value="">— Select an address —</option>';
+        data.result.forEach((addr,i)=>{
+            const parts=[addr.line_1,addr.line_2,addr.line_3,addr.post_town,addr.county].filter(p=>p&&p.trim());
+            const opt=document.createElement('option');opt.value=i;opt.textContent=parts.join(', ');opt.dataset.address=parts.join(', ');
             select.appendChild(opt);
         });
-
         document.getElementById('addressResults').classList.remove('hidden');
-        document.getElementById('bkPostcodeFinal').value = (data.result[0].postcode || postcode).toUpperCase();
-
-    } catch (err) {
-        console.error(err);
-        alert('Error connecting to address lookup. Please enter address manually.');
-    }
+        document.getElementById('bkPostcodeFinal').value=(data.result[0].postcode||postcode).toUpperCase();
+    } catch(err){console.error(err);alert('Address lookup error. Enter address manually.');}
 }
+function selectAddress() { const opt=document.getElementById('addressSelect').options[document.getElementById('addressSelect').selectedIndex]; if(opt&&opt.dataset.address) document.getElementById('bkAddress').value=opt.dataset.address; }
 
-function selectAddress() {
-    const select = document.getElementById('addressSelect');
-    const opt = select.options[select.selectedIndex];
-    if (opt && opt.dataset.address) {
-        document.getElementById('bkAddress').value = opt.dataset.address;
-    }
-}
-
-// ============ BOOKING SUBMIT ============
+// ============ BOOKING + UPS (combined) ============
 function validateBooking() {
-    const name = document.getElementById('bkCustomerName').value.trim();
-    const address = document.getElementById('bkAddress').value.trim();
-    const postcode = document.getElementById('bkPostcodeFinal').value.trim();
-    const phone = document.getElementById('bkPhone').value.trim();
-    const email = document.getElementById('bkEmail').value.trim();
-    const pickup = document.getElementById('bkPickupDate').value;
-    return name && address && postcode && phone && email && pickup;
+    return document.getElementById('bkCustomerName').value.trim() && document.getElementById('bkAddress').value.trim() && document.getElementById('bkPostcodeFinal').value.trim() && document.getElementById('bkPhone').value.trim() && document.getElementById('bkEmail').value.trim() && document.getElementById('bkPickupDate').value;
 }
 
-function submitBooking() {
-    if (!validateBooking()) {
-        document.getElementById('bookingValidation').classList.add('show');
-        return;
-    }
+async function submitBookingAndUPS() {
+    if(!validateBooking()){document.getElementById('bookingValidation').classList.add('show');return;}
     document.getElementById('bookingValidation').classList.remove('show');
 
-    if (!SERVICE_SCRIPT_URL) {
-        alert('⚠️ Apps Script URL not configured yet.\n\nThe booking cannot be saved until SERVICE_SCRIPT_URL is set.');
-        return;
-    }
+    const btn=document.getElementById('bookingSubmitBtn');
+    btn.textContent='Saving booking...'; btn.disabled=true;
 
-    // Calculate EXP date: pickup date + 1 day
-    const pickupISO = document.getElementById('bkPickupDate').value;
-    const pickupDate = new Date(pickupISO);
-    const expDate = new Date(pickupDate);
-    expDate.setDate(expDate.getDate() + 1);
-    const expDD = String(expDate.getDate()).padStart(2, '0');
-    const expMM = String(expDate.getMonth() + 1).padStart(2, '0');
-    const expStr = `EXP ${expDD}/${expMM}`;
+    const pickupISO=document.getElementById('bkPickupDate').value;
+    const pickupDate=new Date(pickupISO);
+    const expDate=new Date(pickupDate); expDate.setDate(expDate.getDate()+1);
+    const expStr=`EXP ${String(expDate.getDate()).padStart(2,'0')}/${String(expDate.getMonth()+1).padStart(2,'0')}`;
+
+    const customerName=document.getElementById('bkCustomerName').value.trim();
+    const customerAddress=document.getElementById('bkAddress').value.trim();
+    const customerPostcode=document.getElementById('bkPostcodeFinal').value.trim().toUpperCase();
+    const customerPhone=document.getElementById('bkPhone').value.trim();
+    const customerEmail=document.getElementById('bkEmail').value.trim();
+
+    // Extract city from address (last meaningful part before postcode)
+    const addrParts=customerAddress.split(',').map(p=>p.trim()).filter(p=>p);
+    const customerCity=addrParts.length>1?addrParts[addrParts.length-1]:addrParts[0]||'';
 
     const bookingData = {
-        action: 'booking',
-        jobNumber: nextJobNumber,
-        callDate: formatDateUK(todayISO()),         // col D
-        packReceived: expStr,                         // col E
-        customerName: document.getElementById('bkCustomerName').value.trim(),  // col F
-        customerAddress: document.getElementById('bkAddress').value.trim(),    // col G
-        postcode: document.getElementById('bkPostcodeFinal').value.trim().toUpperCase(), // col H
-        phone: document.getElementById('bkPhone').value.trim(),               // col I
-        email: document.getElementById('bkEmail').value.trim(),               // col J
-        fault: document.getElementById('bkFault').value.trim(),               // col K
-        packCount: bookingPackCount,
-        pickupDate: formatDateUK(pickupISO)
+        action:'booking', jobNumber:nextJobNumber, callDate:formatDateUK(todayISO()),
+        packReceived:expStr, customerName, customerAddress, postcode:customerPostcode,
+        phone:customerPhone, email:customerEmail,
+        fault:document.getElementById('bkFault').value.trim(),
+        packCount:bookingPackCount, pickupDate:formatDateUK(pickupISO)
     };
 
-    const btn = document.getElementById('bookingSubmitBtn');
-    btn.textContent = 'Saving...'; btn.disabled = true;
+    try {
+        // Step 1: Save booking to sheet
+        btn.textContent='Saving booking...';
+        const bookRes=await fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(bookingData)});
+        const bookResult=await bookRes.json();
+        if(!bookResult.success) throw new Error(bookResult.error||'Booking save failed');
 
-    fetch(SERVICE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(bookingData) })
-    .then(res => res.json())
-    .then(result => {
-        document.getElementById('bookingSuccess').classList.remove('hidden');
-        document.getElementById('bookingError').classList.add('hidden');
-        window.scrollTo(0, 0);
-        alert(`✅ Booking saved!\n\nJob Number: ${nextJobNumber}\nExpected arrival: ${expStr}\n\nThe job has been added to the sheet.`);
-        btn.textContent = 'Save Booking to Sheet'; btn.disabled = false;
+        // Step 2: Generate UPS label
+        btn.textContent='Generating UPS label...';
+        const labelData = {
+            action:'generateLabel', jobNumber:nextJobNumber,
+            customerName, customerAddress, customerCity, customerPostcode, customerPhone, customerEmail,
+            weight:bookingPackCount*10, packCount:bookingPackCount
+        };
+        const labelRes=await fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(labelData)});
+        const labelResult=await labelRes.json();
+        if(!labelResult.success) throw new Error(labelResult.error||'Label generation failed');
 
-        // Reload jobs and return to job selector
-        setTimeout(() => { closeBookingPortal(); loadJobs(); }, 1500);
-    })
-    .catch(err => {
-        document.getElementById('bookingError').textContent = 'Error saving booking: ' + err.message;
+        // Step 3: Schedule pickup
+        btn.textContent='Scheduling pickup...';
+        const pickupData = {
+            action:'schedulePickup', jobNumber:nextJobNumber,
+            customerName, customerAddress, customerCity, customerPostcode, customerPhone,
+            packCount:bookingPackCount, pickupDate:formatDateUK(pickupISO), pickupDateISO:pickupISO
+        };
+        const pickupRes=await fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(pickupData)});
+        const pickupResult=await pickupRes.json();
+        if(!pickupResult.success) throw new Error(pickupResult.error||'Pickup scheduling failed');
+
+        // Store results for email sending
+        lastBookingData = { ...bookingData, customerCity, customerEmail };
+        lastUPSResult = {
+            trackingNumber: labelResult.trackingNumber,
+            labelBase64: labelResult.labelBase64,
+            pickupConfirmation: pickupResult.pickupConfirmation
+        };
+
+        // Show success
+        const packText = bookingPackCount > 1 ? `(${bookingPackCount} packs: ${nextJobNumber} #1 to #${bookingPackCount})` : '';
+        document.getElementById('upsSuccessMsg').innerHTML = `
+            ✓ Booking saved ${packText}<br>
+            ✓ UPS Label generated — Tracking: <strong>${labelResult.trackingNumber}</strong><br>
+            ✓ Pickup scheduled — Ref: <strong>${pickupResult.pickupConfirmation}</strong>
+        `;
+        document.getElementById('upsResults').classList.remove('hidden');
+        document.getElementById('bookingSuccess').classList.add('hidden');
+        btn.textContent='✓ Complete'; btn.disabled=true;
+        window.scrollTo(0, document.getElementById('upsResults').offsetTop - 100);
+
+    } catch(err) {
+        console.error(err);
+        document.getElementById('bookingError').textContent='Error: '+err.message;
         document.getElementById('bookingError').classList.remove('hidden');
-        btn.textContent = 'Save Booking to Sheet'; btn.disabled = false;
-        window.scrollTo(0, 0);
-    });
+        btn.textContent='Book Repair, Generate Label & Schedule Pickup'; btn.disabled=false;
+        window.scrollTo(0,0);
+    }
+}
+
+// ============ SEND LABEL EMAIL ============
+async function sendLabelEmail() {
+    if(!lastBookingData||!lastUPSResult){alert('No booking data available. Please complete a booking first.');return;}
+    try {
+        const res=await fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+            action:'sendEmail', jobNumber:lastBookingData.jobNumber,
+            customerName:lastBookingData.customerName, customerEmail:lastBookingData.customerEmail,
+            pickupDate:lastBookingData.pickupDate, pickupConfirmation:lastUPSResult.pickupConfirmation,
+            trackingNumber:lastUPSResult.trackingNumber, labelBase64:lastUPSResult.labelBase64
+        })});
+        const result=await res.json();
+        if(result.success) alert(`✅ Email sent to ${lastBookingData.customerEmail}`);
+        else throw new Error(result.error);
+    } catch(err) { alert('Error sending email: '+err.message); }
+}
+
+// ============ RESEND / EDIT EMAIL MODAL ============
+function openResendModal() {
+    if(!lastBookingData||!lastUPSResult){alert('No booking data available.');return;}
+    const name=lastBookingData.customerName;
+    const pickupDate=lastBookingData.pickupDate;
+    const pickupRef=lastUPSResult.pickupConfirmation||'';
+
+    document.getElementById('modalSubject').value=`Portable Power - UPS Collection & Shipping Label - ${lastBookingData.jobNumber}`;
+    document.getElementById('modalBody').value=`Hi ${name}\n\nFurther to our telephone conversation today, a collection by UPS has been arranged for between 09.00am and 5pm on ${pickupDate}.${pickupRef?' Your pickup reference is '+pickupRef+'.':''}\n\nPlease print the attached shipping label and stick it on the box containing your Power Pack.\n\nThe box needs to be large enough to accommodate your power pack, mains charger and both leads, along with sufficient packing material to ensure nothing gets damaged in transit.\n\nI'm afraid that neither UPS, nor Portable Power Ltd. will pay compensation for inadequately packed items.\n\nYour leads must not be connected to the Power Pack, as this creates a serious fire risk.\n\nWith best regards,\nPortable Power LTD`;
+
+    document.getElementById('emailModal').classList.remove('hidden');
+}
+function closeEmailModal() { document.getElementById('emailModal').classList.add('hidden'); }
+async function sendEditedEmail() {
+    try {
+        const res=await fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+            action:'resendEmail', jobNumber:lastBookingData.jobNumber,
+            customerName:lastBookingData.customerName, customerEmail:lastBookingData.customerEmail,
+            emailSubject:document.getElementById('modalSubject').value,
+            customEmailBody:document.getElementById('modalBody').value,
+            trackingNumber:lastUPSResult.trackingNumber, labelBase64:lastUPSResult.labelBase64
+        })});
+        const result=await res.json();
+        if(result.success){alert(`✅ Email sent to ${lastBookingData.customerEmail}`);closeEmailModal();}
+        else throw new Error(result.error);
+    } catch(err) { alert('Error sending email: '+err.message); }
+}
+
+// ============ REBOOK PICKUP ============
+function openRebookModal() {
+    document.getElementById('jobSelector').classList.add('hidden');
+    document.getElementById('rebookPortal').classList.remove('hidden');
+    document.getElementById('rebookSuccess').classList.add('hidden');
+    document.getElementById('rebookError').classList.add('hidden');
+    ['rbJobNumber','rbCustomerName','rbAddress','rbPostcode','rbPhone'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('rbPickupDate').value='';
+    rebookPackCount=1;
+    document.querySelectorAll('#rebookPortal .pack-count-btn').forEach(b=>b.classList.toggle('selected',b.dataset.rpacks==='1'));
+    window.scrollTo(0,0);
+}
+function closeRebookPortal() { document.getElementById('rebookPortal').classList.add('hidden'); document.getElementById('jobSelector').classList.remove('hidden'); }
+function selectRebookPackCount(el) {
+    el.closest('.pack-count-row').querySelectorAll('.pack-count-btn').forEach(b=>b.classList.remove('selected'));
+    el.classList.add('selected');
+    rebookPackCount=parseInt(el.dataset.rpacks);
+}
+
+async function submitRebook() {
+    const jn=document.getElementById('rbJobNumber').value.trim();
+    const name=document.getElementById('rbCustomerName').value.trim();
+    const addr=document.getElementById('rbAddress').value.trim();
+    const pc=document.getElementById('rbPostcode').value.trim();
+    const phone=document.getElementById('rbPhone').value.trim();
+    const pickup=document.getElementById('rbPickupDate').value;
+    if(!jn||!name||!addr||!pc||!pickup){alert('Please fill in all fields.');return;}
+
+    const addrParts=addr.split(',').map(p=>p.trim()).filter(p=>p);
+    const city=addrParts.length>1?addrParts[addrParts.length-1]:addrParts[0]||'';
+
+    const btn=document.getElementById('rebookSubmitBtn');
+    btn.textContent='Scheduling...'; btn.disabled=true;
+    try {
+        const res=await fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+            action:'rebookPickup', jobNumber:jn,
+            customerName:name, customerAddress:addr, customerCity:city, customerPostcode:pc.toUpperCase(), customerPhone:phone,
+            packCount:rebookPackCount, pickupDateISO:pickup
+        })});
+        const result=await res.json();
+        if(result.success){
+            document.getElementById('rebookSuccess').textContent=`✓ Pickup rebooked! Ref: ${result.pickupConfirmation}`;
+            document.getElementById('rebookSuccess').classList.remove('hidden');
+            alert(`✅ Pickup rebooked!\n\nReference: ${result.pickupConfirmation}`);
+        } else throw new Error(result.error);
+    } catch(err){
+        document.getElementById('rebookError').textContent='Error: '+err.message;
+        document.getElementById('rebookError').classList.remove('hidden');
+    }
+    btn.textContent='Rebook Pickup'; btn.disabled=false;
 }
 
 // ============ INIT ============
