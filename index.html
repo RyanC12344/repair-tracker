@@ -34,7 +34,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .form-group { margin-bottom: 25px; }
 label { display: block; font-weight: 600; margin-bottom: 8px; color: #333; font-size: 16px; }
 .sub-label { font-size: 14px; color: #666; font-weight: normal; }
-input[type="text"], input[type="number"], input[type="date"], textarea, select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; font-family: inherit; background: white; }
+input[type="text"], input[type="number"], input[type="date"], input[type="email"], input[type="tel"], textarea, select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; font-family: inherit; background: white; }
 input:focus, textarea:focus, select:focus { outline: none; border-color: #c41e3a; }
 textarea { resize: vertical; min-height: 80px; }
 
@@ -70,7 +70,6 @@ textarea { resize: vertical; min-height: 80px; }
 .pf-card .pf-title { font-size: 17px; font-weight: 700; color: #1a2332; margin-bottom: 12px; }
 .pf-card.disabled { opacity: 0.45; background: #f0f0f0; }
 .pf-card.disabled .pf-title::after { content: ' (not received)'; font-weight: normal; color: #999; font-size: 14px; }
-
 .charger-type-block { margin-top: 14px; padding-top: 14px; border-top: 1px solid #e0e0e0; }
 .charger-type-block .sub-label { margin-bottom: 8px; display: block; }
 
@@ -100,7 +99,7 @@ textarea { resize: vertical; min-height: 80px; }
 .btn-submit { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; }
 .btn-submit:hover { box-shadow: 0 10px 30px rgba(40, 167, 69, 0.4); }
 .btn-save-draft { background: #ffc107; color: #1a2332; font-weight: 700; margin-top: 20px; width: 100%; }
-.btn-save-draft:hover { background: #e0a800; box-shadow: 0 4px 12px rgba(255, 193, 7, 0.4); }
+.btn-save-draft:hover { background: #e0a800; }
 
 .validation-msg { background: #fff3cd; border: 2px solid #ffc107; color: #856404; padding: 12px 16px; border-radius: 8px; margin-top: 15px; font-weight: 600; display: none; }
 .validation-msg.show { display: block; animation: fadeIn 0.3s; }
@@ -129,9 +128,9 @@ textarea { resize: vertical; min-height: 80px; }
 .stats-dashboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
 .stat-card { background: white; border: 2px solid #e0e0e0; border-radius: 12px; padding: 20px; text-align: center; transition: all 0.3s; }
 .stat-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
-.stat-today { border-color: #c41e3a; background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%); }
-.stat-current { border-color: #1a2332; background: linear-gradient(135deg, #f0f3f5 0%, #ffffff 100%); }
-.stat-completed { border-color: #28a745; background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%); }
+.stat-today { border-color: #c41e3a; }
+.stat-current { border-color: #1a2332; }
+.stat-completed { border-color: #28a745; }
 .stat-number { font-size: 36px; font-weight: 700; margin-bottom: 8px; }
 .stat-today .stat-number { color: #c41e3a; }
 .stat-current .stat-number { color: #1a2332; }
@@ -140,6 +139,32 @@ textarea { resize: vertical; min-height: 80px; }
 
 .invoice-row { margin-top: 15px; display: none; }
 .invoice-row.show { display: block; animation: fadeIn 0.3s; }
+
+/* ===== BOOKING PORTAL STYLES ===== */
+.new-booking-btn { display: block; width: 100%; padding: 18px; background: linear-gradient(135deg, #1a2332 0%, #2d3e50 100%); color: white; border: 3px solid #c41e3a; border-radius: 10px; font-size: 18px; font-weight: 700; cursor: pointer; transition: all 0.3s; margin-bottom: 25px; letter-spacing: 0.5px; }
+.new-booking-btn:hover { background: #c41e3a; transform: translateY(-2px); box-shadow: 0 8px 25px rgba(196,30,58,0.4); }
+
+.booking-header { background: #1a2332; padding: 20px; border-bottom: 3px solid #c41e3a; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; color: white; gap: 15px; }
+.booking-job-number { font-size: 22px; font-weight: 700; }
+.booking-job-label { font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px; }
+
+.postcode-lookup { display: flex; gap: 10px; margin-bottom: 10px; }
+.postcode-lookup input { flex: 1; }
+.postcode-lookup button { flex: 0 0 auto; padding: 12px 20px; background: #1a2332; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 16px; white-space: nowrap; }
+.postcode-lookup button:hover { background: #c41e3a; }
+
+.address-results { margin-bottom: 15px; }
+.address-results select { padding: 12px; font-size: 16px; }
+
+.email-suffix-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.email-suffix-btn { padding: 8px 14px; background: #e7f3ff; border: 2px solid #667eea; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 600; color: #667eea; transition: all 0.2s; }
+.email-suffix-btn:hover { background: #667eea; color: white; }
+
+.pack-count-row { display: flex; gap: 12px; margin-top: 10px; }
+.pack-count-btn { flex: 1; padding: 18px; text-align: center; background: #f8f9fa; border: 2px solid transparent; border-radius: 8px; font-weight: 700; font-size: 18px; cursor: pointer; transition: all 0.2s; }
+.pack-count-btn:hover { background: #e9ecef; }
+.pack-count-btn.selected { background: #d4edda; border-color: #28a745; color: #155724; }
+.pack-weight { text-align: center; margin-top: 10px; font-size: 15px; color: #666; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -150,7 +175,10 @@ textarea { resize: vertical; min-height: 80px; }
         <p>Streamlined Repair Documentation</p>
     </div>
 
+    <!-- ===================== JOB SELECTOR ===================== -->
     <div id="jobSelector" class="job-selector">
+        <button class="new-booking-btn" onclick="openBookingPortal()">+ New Booking</button>
+
         <h2 class="section-title">Select a Job to Begin Repair</h2>
         <div style="text-align: center; color: #1a2332; font-weight: 600; margin-bottom: 20px; font-size: 16px;" id="currentMonthDisplay"></div>
 
@@ -169,7 +197,7 @@ textarea { resize: vertical; min-height: 80px; }
         <div style="margin-bottom: 25px;">
             <div style="display: flex; gap: 15px; margin-bottom: 15px;">
                 <div style="flex: 1;"><label for="dateFilter">Filter by Date:</label><input type="date" id="dateFilter" onchange="filterJobs()"></div>
-                <div style="flex: 1;"><label for="searchJob">Search Job Number:</label><input type="text" id="searchJob" placeholder="e.g., R1101" oninput="filterJobs()"></div>
+                <div style="flex: 1;"><label for="searchJob">Search Job Number:</label><input type="text" id="searchJob" placeholder="e.g., S0401" oninput="filterJobs()"></div>
             </div>
             <button onclick="showAllJobs()" style="padding: 10px 20px; background: #1a2332; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Show All</button>
             <button onclick="showTodayJobs()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; margin-left: 10px;">Today's Jobs</button>
@@ -180,6 +208,103 @@ textarea { resize: vertical; min-height: 80px; }
         <div class="job-list" id="jobList"></div>
     </div>
 
+    <!-- ===================== BOOKING PORTAL ===================== -->
+    <div id="bookingPortal" class="hidden">
+        <div class="booking-header">
+            <button class="back-to-jobs-btn" onclick="closeBookingPortal()"><span style="font-size: 18px;">←</span> Back</button>
+            <div>
+                <span class="booking-job-label">New Job Number</span>
+                <span class="booking-job-number" id="bookingJobNumber">—</span>
+            </div>
+            <div>
+                <span class="booking-job-label">Call Date</span>
+                <span id="bookingCallDate">—</span>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div id="bookingSuccess" class="success-message hidden">✓ Booking saved to sheet!</div>
+            <div id="bookingError" class="error-message hidden"></div>
+
+            <div class="section-title">Book New Repair</div>
+
+            <!-- Customer Name -->
+            <div class="form-group">
+                <label for="bkCustomerName">Customer Name</label>
+                <input type="text" id="bkCustomerName" placeholder="Enter customer name">
+            </div>
+
+            <!-- Postcode Lookup -->
+            <div class="form-group">
+                <label>Address</label>
+                <div class="postcode-lookup">
+                    <input type="text" id="bkPostcode" placeholder="Enter postcode" maxlength="10" style="text-transform: uppercase;">
+                    <button type="button" onclick="lookupPostcode()">Find Address</button>
+                </div>
+                <div class="address-results hidden" id="addressResults">
+                    <select id="addressSelect" onchange="selectAddress()">
+                        <option value="">— Select an address —</option>
+                    </select>
+                </div>
+                <div style="margin-top: 10px;">
+                    <input type="text" id="bkAddress" placeholder="Full address (auto-filled or type manually)" style="margin-bottom: 8px;">
+                    <input type="text" id="bkPostcodeFinal" placeholder="Postcode" style="text-transform: uppercase;">
+                </div>
+            </div>
+
+            <!-- Phone -->
+            <div class="form-group">
+                <label for="bkPhone">Phone Number</label>
+                <input type="tel" id="bkPhone" placeholder="Enter phone number">
+            </div>
+
+            <!-- Email with quick suffixes -->
+            <div class="form-group">
+                <label for="bkEmail">Email Address</label>
+                <input type="email" id="bkEmail" placeholder="Enter email address">
+                <div class="email-suffix-row">
+                    <span class="email-suffix-btn" onclick="appendEmailSuffix('@gmail.com')">@gmail.com</span>
+                    <span class="email-suffix-btn" onclick="appendEmailSuffix('@hotmail.com')">@hotmail.com</span>
+                    <span class="email-suffix-btn" onclick="appendEmailSuffix('@hotmail.co.uk')">@hotmail.co.uk</span>
+                    <span class="email-suffix-btn" onclick="appendEmailSuffix('@yahoo.co.uk')">@yahoo.co.uk</span>
+                    <span class="email-suffix-btn" onclick="appendEmailSuffix('@outlook.com')">@outlook.com</span>
+                    <span class="email-suffix-btn" onclick="appendEmailSuffix('@icloud.com')">@icloud.com</span>
+                </div>
+            </div>
+
+            <!-- Fault -->
+            <div class="form-group">
+                <label for="bkFault">Fault Reported</label>
+                <textarea id="bkFault" placeholder="Describe the fault reported by the customer"></textarea>
+            </div>
+
+            <!-- Number of Packs -->
+            <div class="form-group">
+                <label>Number of Packs</label>
+                <div class="pack-count-row">
+                    <div class="pack-count-btn selected" data-packs="1" onclick="selectPackCount(this)">1 Pack</div>
+                    <div class="pack-count-btn" data-packs="2" onclick="selectPackCount(this)">2 Packs</div>
+                    <div class="pack-count-btn" data-packs="3" onclick="selectPackCount(this)">3 Packs</div>
+                </div>
+                <div class="pack-weight" id="packWeightDisplay">Shipment weight: 10 kg</div>
+            </div>
+
+            <!-- Pickup Date -->
+            <div class="form-group">
+                <label for="bkPickupDate">Collection Date <span class="sub-label">(Date UPS will collect from customer)</span></label>
+                <input type="date" id="bkPickupDate">
+            </div>
+
+            <div class="validation-msg" id="bookingValidation">Please fill in all required fields: name, address, postcode, phone, email, and pickup date.</div>
+
+            <!-- Booking Submit -->
+            <div class="navigation-buttons">
+                <button type="button" class="btn btn-submit" onclick="submitBooking()" id="bookingSubmitBtn">Save Booking to Sheet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== REPAIR FORM ===================== -->
     <div id="repairForm" class="hidden">
         <div class="job-info">
             <button class="back-to-jobs-btn" onclick="backToJobSelector()"><span style="font-size: 18px;">←</span> Back</button>
@@ -199,7 +324,6 @@ textarea { resize: vertical; min-height: 80px; }
             <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width: 20%"></div></div>
 
             <form id="mainForm">
-
                 <div class="section-page active" data-page="1">
                     <div class="section-title">Package Received</div>
                     <div class="date-row">
@@ -230,8 +354,7 @@ textarea { resize: vertical; min-height: 80px; }
                                 <div class="radio-item" data-pf="chargerTest" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
                                 <div class="radio-item fail" data-pf="chargerTest" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
                             </div>
-                            <div class="charger-type-block">
-                                <span class="sub-label">Charger type:</span>
+                            <div class="charger-type-block"><span class="sub-label">Charger type:</span>
                                 <div class="radio-group three-col sub">
                                     <div class="radio-item small" data-pf="chargerType" data-val="2AH" onclick="selectPF(this)">2AH</div>
                                     <div class="radio-item small" data-pf="chargerType" data-val="5AH" onclick="selectPF(this)">5AH</div>
@@ -246,15 +369,13 @@ textarea { resize: vertical; min-height: 80px; }
                                 <div class="radio-item fail" data-pf="leadsTest" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
                             </div>
                         </div>
-                        <div class="pf-card">
-                            <div class="pf-title">Panel Sockets</div>
+                        <div class="pf-card"><div class="pf-title">Panel Sockets</div>
                             <div class="radio-group">
                                 <div class="radio-item" data-pf="panelSockets" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
                                 <div class="radio-item fail" data-pf="panelSockets" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
                             </div>
                         </div>
-                        <div class="pf-card">
-                            <div class="pf-title">Lights on Pack</div>
+                        <div class="pf-card"><div class="pf-title">Lights on Pack</div>
                             <div class="radio-group">
                                 <div class="radio-item" data-pf="lightsState" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
                                 <div class="radio-item fail" data-pf="lightsState" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
@@ -271,45 +392,29 @@ textarea { resize: vertical; min-height: 80px; }
 
                 <div class="section-page" data-page="3">
                     <div class="section-title">Pack Inspection</div>
-                    <div class="form-group">
-                        <label>Serial Number</label>
+                    <div class="form-group"><label>Serial Number</label>
                         <div class="serial-block">
                             <div class="serial-display">
-                                <div class="serial-prefix-select">
-                                    <select id="serialPrefix"><option value="NA">NA</option><option value="DZ1H">DZ1H</option></select>
-                                </div>
+                                <div class="serial-prefix-select"><select id="serialPrefix"><option value="NA">NA</option><option value="DZ1H">DZ1H</option></select></div>
                                 <div class="serial-digits empty" id="serialDigits">_____</div>
                             </div>
                             <div class="numpad">
-                                <button type="button" onclick="numpad('1')">1</button>
-                                <button type="button" onclick="numpad('2')">2</button>
-                                <button type="button" onclick="numpad('3')">3</button>
-                                <button type="button" onclick="numpad('4')">4</button>
-                                <button type="button" onclick="numpad('5')">5</button>
-                                <button type="button" onclick="numpad('6')">6</button>
-                                <button type="button" onclick="numpad('7')">7</button>
-                                <button type="button" onclick="numpad('8')">8</button>
-                                <button type="button" onclick="numpad('9')">9</button>
-                                <button type="button" class="clear" onclick="numpadClear()">Clear</button>
-                                <button type="button" onclick="numpad('0')">0</button>
-                                <button type="button" class="action" onclick="numpadBack()">⌫</button>
+                                <button type="button" onclick="numpad('1')">1</button><button type="button" onclick="numpad('2')">2</button><button type="button" onclick="numpad('3')">3</button>
+                                <button type="button" onclick="numpad('4')">4</button><button type="button" onclick="numpad('5')">5</button><button type="button" onclick="numpad('6')">6</button>
+                                <button type="button" onclick="numpad('7')">7</button><button type="button" onclick="numpad('8')">8</button><button type="button" onclick="numpad('9')">9</button>
+                                <button type="button" class="clear" onclick="numpadClear()">Clear</button><button type="button" onclick="numpad('0')">0</button><button type="button" class="action" onclick="numpadBack()">⌫</button>
                             </div>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label for="popDate">P.O.P. Date <span class="sub-label">(Date Pack Originally Sold — optional)</span></label>
-                        <input type="date" id="popDate">
-                    </div>
-                    <div class="form-group">
-                        <label>Battery Make</label>
+                    <div class="form-group"><label for="popDate">P.O.P. Date <span class="sub-label">(optional)</span></label><input type="date" id="popDate"></div>
+                    <div class="form-group"><label>Battery Make</label>
                         <div class="radio-group three-col">
                             <div class="radio-item" data-pf="batteryMake" data-val="BB22" onclick="selectPF(this)">BB22</div>
                             <div class="radio-item" data-pf="batteryMake" data-val="BB24" onclick="selectPF(this)">BB24</div>
                             <div class="radio-item neutral" data-pf="batteryMake" data-val="NOT OURS" onclick="selectPF(this)">NOT OURS</div>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label>Pack Test</label>
+                    <div class="form-group"><label>Pack Test</label>
                         <div class="radio-group">
                             <div class="radio-item" data-pf="packTest" data-val="Pass" onclick="selectPF(this)">✓ Pass</div>
                             <div class="radio-item fail" data-pf="packTest" data-val="Fail" onclick="selectPF(this)">✗ Fail</div>
@@ -325,22 +430,15 @@ textarea { resize: vertical; min-height: 80px; }
 
                 <div class="section-page" data-page="4">
                     <div class="section-title">Repair Category</div>
-                    <div class="form-group">
-                        <label>Category</label>
+                    <div class="form-group"><label>Category</label>
                         <div class="radio-group three-col">
                             <div class="radio-item warranty" data-pf="category" data-val="WARRANTY" onclick="selectPF(this); toggleInvoiceField()">Warranty</div>
                             <div class="radio-item paid" data-pf="category" data-val="PAID" onclick="selectPF(this); toggleInvoiceField()">Paid</div>
                             <div class="radio-item goodwill" data-pf="category" data-val="GOODWILL" onclick="selectPF(this); toggleInvoiceField()">Goodwill</div>
                         </div>
-                        <div class="invoice-row" id="invoiceRow">
-                            <label for="invoiceNumber" style="margin-top: 18px;">Invoice Number</label>
-                            <input type="text" id="invoiceNumber" placeholder="Enter invoice number">
-                        </div>
+                        <div class="invoice-row" id="invoiceRow"><label for="invoiceNumber" style="margin-top: 18px;">Invoice Number</label><input type="text" id="invoiceNumber" placeholder="Enter invoice number"></div>
                     </div>
-                    <div class="form-group">
-                        <label for="fedexTracking">Return Tracking Number <span class="sub-label">(optional)</span></label>
-                        <input type="text" id="fedexTracking" placeholder="Enter return tracking number">
-                    </div>
+                    <div class="form-group"><label for="fedexTracking">Return Tracking Number <span class="sub-label">(optional)</span></label><input type="text" id="fedexTracking" placeholder="Enter return tracking number"></div>
                     <div class="validation-msg" id="validation4">Category required. Invoice number required for Paid repairs.</div>
                     <div class="navigation-buttons">
                         <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
@@ -351,8 +449,7 @@ textarea { resize: vertical; min-height: 80px; }
 
                 <div class="section-page" data-page="5">
                     <div class="section-title">Items Used in Repair</div>
-                    <div class="form-group">
-                        <label>Tick all parts used:</label>
+                    <div class="form-group"><label>Tick all parts used:</label>
                         <div class="checkbox-group">
                             <div class="checkbox-item" onclick="toggleCheckbox('partCircuitBoard')"><input type="checkbox" id="partCircuitBoard"><label>Circuit Board</label></div>
                             <div class="checkbox-item" onclick="toggleCheckbox('partFrontCase')"><input type="checkbox" id="partFrontCase"><label>Front Case</label></div>
@@ -372,7 +469,6 @@ textarea { resize: vertical; min-height: 80px; }
                     </div>
                     <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
-
             </form>
         </div>
     </div>
@@ -380,8 +476,10 @@ textarea { resize: vertical; min-height: 80px; }
 
 <script>
 // ============ CONFIG ============
-const SHEET_ID = '1iVCdZRmTXEfbV8_tmjomq7Cs8-za80yuW8z3QwpdXBk'; // 2026 SERVICE SHEET
-const SERVICE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxZEMgdG1vfqT4L7HuGreb1_o8Ltrxmc5wIgYID4i_sghLa-Ey2TJhzi3Giz54qIlE10A/exec'; // TODO: Paste Apps Script Web App URL here once deployed
+const SHEET_ID = '1iVCdZRmTXEfbV8_tmjomq7Cs8-za80yuW8z3QwpdXBk';
+const SERVICE_SCRIPT_URL = ''; // TODO: Paste repair Apps Script URL
+const BOOKING_SCRIPT_URL = ''; // TODO: Paste booking Apps Script URL (can be same script, different function)
+const GETADDRESS_API_KEY = 'jcOKsbzAUUqFps1vDBgajQ51578';
 
 const MONTH_GIDS = {
     1: null, 2: null, 3: null,
@@ -400,6 +498,8 @@ const totalPages = 5;
 let allJobs = [], currentJobs = [], expectedJobs = [], completedJobs = [];
 let activeTab = 'current';
 let serialDigitsValue = '';
+let bookingPackCount = 1;
+let nextJobNumber = '';
 
 // ============ DATE HELPERS ============
 function todayISO() { return new Date().toISOString().split('T')[0]; }
@@ -437,19 +537,16 @@ function toggleCheckbox(id) {
     cb.closest('.checkbox-item').classList.toggle('checked', cb.checked);
 }
 function selectPF(el) {
-    const group = el.dataset.pf;
-    document.querySelectorAll(`[data-pf="${group}"]`).forEach(n => n.classList.remove('checked'));
+    document.querySelectorAll(`[data-pf="${el.dataset.pf}"]`).forEach(n => n.classList.remove('checked'));
     el.classList.add('checked');
 }
 function getPF(group) {
     const sel = document.querySelector(`[data-pf="${group}"].checked`);
     return sel ? sel.dataset.val : '';
 }
-function toggleInvoiceField() {
-    document.getElementById('invoiceRow').classList.toggle('show', getPF('category') === 'PAID');
-}
+function toggleInvoiceField() { document.getElementById('invoiceRow').classList.toggle('show', getPF('category') === 'PAID'); }
 
-// ============ PAGE NAV + VALIDATION ============
+// ============ PAGE NAV + VALIDATION (repair form) ============
 function updateProgress() {
     document.getElementById('progressFill').style.width = (currentPage / totalPages * 100) + '%';
     document.getElementById('progressText').textContent = `Step ${currentPage} of ${totalPages}`;
@@ -457,44 +554,29 @@ function updateProgress() {
 function showPage(n) {
     document.querySelectorAll('.section-page').forEach(p => p.classList.remove('active'));
     document.querySelector(`.section-page[data-page="${n}"]`).classList.add('active');
-    currentPage = n;
-    updateProgress();
-    window.scrollTo(0, 0);
+    currentPage = n; updateProgress(); window.scrollTo(0, 0);
     document.querySelectorAll('.validation-msg').forEach(m => m.classList.remove('show'));
     if (n === 2) {
-        const hasCharger = document.getElementById('receivedCharger').checked;
-        const hasLeads = document.getElementById('receivedLeads').checked;
-        const cardCharger = document.getElementById('cardCharger');
-        const cardLeads = document.getElementById('cardLeads');
-        cardCharger.classList.toggle('disabled', !hasCharger);
-        cardCharger.style.pointerEvents = hasCharger ? 'auto' : 'none';
-        cardLeads.classList.toggle('disabled', !hasLeads);
-        cardLeads.style.pointerEvents = hasLeads ? 'auto' : 'none';
+        const hc = document.getElementById('receivedCharger').checked, hl = document.getElementById('receivedLeads').checked;
+        document.getElementById('cardCharger').classList.toggle('disabled', !hc);
+        document.getElementById('cardCharger').style.pointerEvents = hc ? 'auto' : 'none';
+        document.getElementById('cardLeads').classList.toggle('disabled', !hl);
+        document.getElementById('cardLeads').style.pointerEvents = hl ? 'auto' : 'none';
     }
 }
 function validatePage(n) {
     if (n === 1) return !!document.getElementById('receivedDate').value;
     if (n === 2) {
-        const hasCharger = document.getElementById('receivedCharger').checked;
-        const hasLeads = document.getElementById('receivedLeads').checked;
-        if (hasCharger && (!getPF('chargerTest') || !getPF('chargerType'))) return false;
-        if (hasLeads && !getPF('leadsTest')) return false;
-        if (!getPF('panelSockets') || !getPF('lightsState')) return false;
-        return true;
+        const hc = document.getElementById('receivedCharger').checked, hl = document.getElementById('receivedLeads').checked;
+        if (hc && (!getPF('chargerTest') || !getPF('chargerType'))) return false;
+        if (hl && !getPF('leadsTest')) return false;
+        return getPF('panelSockets') && getPF('lightsState');
     }
     if (n === 3) return serialDigitsValue.length === 5 && getPF('batteryMake') && getPF('packTest');
-    if (n === 4) {
-        const cat = getPF('category');
-        if (!cat) return false;
-        if (cat === 'PAID' && !document.getElementById('invoiceNumber').value.trim()) return false;
-        return true;
-    }
+    if (n === 4) { const c = getPF('category'); return c && (c !== 'PAID' || document.getElementById('invoiceNumber').value.trim()); }
     return true;
 }
-function nextPage() {
-    if (!validatePage(currentPage)) { document.getElementById('validation' + currentPage).classList.add('show'); return; }
-    if (currentPage < totalPages) showPage(currentPage + 1);
-}
+function nextPage() { if (!validatePage(currentPage)) { document.getElementById('validation' + currentPage).classList.add('show'); return; } if (currentPage < totalPages) showPage(currentPage + 1); }
 function previousPage() { if (currentPage > 1) showPage(currentPage - 1); }
 
 // ============ JOB LOADING ============
@@ -504,69 +586,43 @@ function parseCSV(text) {
         const c = text[i], n = text[i + 1];
         if (c === '"') { if (q && n === '"') { field += '"'; i++; } else q = !q; }
         else if (c === ',' && !q) { row.push(field); field = ''; }
-        else if ((c === '\n' || c === '\r') && !q) {
-            if (c === '\r' && n === '\n') i++;
-            if (field || row.length) { row.push(field); rows.push(row); row = []; field = ''; }
-        } else field += c;
+        else if ((c === '\n' || c === '\r') && !q) { if (c === '\r' && n === '\n') i++; if (field || row.length) { row.push(field); rows.push(row); row = []; field = ''; } }
+        else field += c;
     }
     if (field || row.length) { row.push(field); rows.push(row); }
     return rows;
 }
-function parseExpectedDate(s) {
-    if (!s) return null;
-    const m = s.match(/EXP\s*(\d{1,2})\/(\d{1,2})/i);
-    if (!m) return null;
-    return new Date(new Date().getFullYear(), parseInt(m[2]) - 1, parseInt(m[1]));
-}
+function parseExpectedDate(s) { if (!s) return null; const m = s.match(/EXP\s*(\d{1,2})\/(\d{1,2})/i); return m ? new Date(new Date().getFullYear(), parseInt(m[2]) - 1, parseInt(m[1])) : null; }
 function parseDateFromSheet(s) {
     if (!s) return null;
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) return d;
-    const p = s.split('/');
-    if (p.length === 3) {
-        const dd = parseInt(p[0]), mm = parseInt(p[1]) - 1, yy = parseInt(p[2]);
-        if (!isNaN(dd) && !isNaN(mm) && !isNaN(yy)) return new Date(yy, mm, dd);
-    }
+    const d = new Date(s); if (!isNaN(d.getTime())) return d;
+    const p = s.split('/'); if (p.length === 3) { const dd = parseInt(p[0]), mm = parseInt(p[1]) - 1, yy = parseInt(p[2]); if (!isNaN(dd+mm+yy)) return new Date(yy, mm, dd); }
     return null;
 }
 function getDateCategory(d) {
-    if (!d) return 'future';
-    const today = new Date(); today.setHours(0,0,0,0);
+    if (!d) return 'future'; const today = new Date(); today.setHours(0,0,0,0);
     const tom = new Date(today); tom.setDate(tom.getDate() + 1);
     const wk = new Date(today); wk.setDate(wk.getDate() + 7);
     const ed = new Date(d); ed.setHours(0,0,0,0);
-    if (ed.getTime() === today.getTime()) return 'today';
-    if (ed.getTime() === tom.getTime()) return 'tomorrow';
-    if (ed <= wk) return 'soon';
-    return 'future';
+    if (ed.getTime() === today.getTime()) return 'today'; if (ed.getTime() === tom.getTime()) return 'tomorrow'; if (ed <= wk) return 'soon'; return 'future';
 }
+
+let cachedRows = []; // store raw CSV rows for job number generation
 
 async function loadJobs() {
     try {
-        const gid = getCurrentMonthGid();
-        const month = getCurrentMonthName();
-        if (gid === null) {
-            document.getElementById('loadingJobs').innerHTML = `<div class="error-message">No GID configured for ${month}.</div>`;
-            return;
-        }
+        const gid = getCurrentMonthGid(); const month = getCurrentMonthName();
+        if (gid === null) { document.getElementById('loadingJobs').innerHTML = `<div class="error-message">No GID configured for ${month}.</div>`; return; }
         const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
-        const res = await fetch(url);
-        const text = await res.text();
-        const rows = parseCSV(text).slice(1);
+        const res = await fetch(url); const text = await res.text();
+        const allRows = parseCSV(text);
+        cachedRows = allRows; // store for job number generation
+        const rows = allRows.slice(1);
 
         document.getElementById('loadingJobs').classList.add('hidden');
         document.getElementById('currentMonthDisplay').textContent = `Viewing: ${month} ${new Date().getFullYear()}`;
-
         const today = new Date(); today.setHours(0,0,0,0);
-        // Column mapping: A=0 Job, E=4 Pack Received, F=5 Customer Name, G=6 Address, N=13 Serial
-        const all = rows.map((r, i) => ({
-            jobNumber: r[0] || '',
-            customerName: r[5] || '',
-            customerAddress: r[6] || '',
-            packReceived: r[4] || '',
-            serialNumber: r[13] || '',
-            rowIndex: i + 2
-        }));
+        const all = rows.map((r, i) => ({ jobNumber: r[0]||'', customerName: r[5]||'', customerAddress: r[6]||'', packReceived: r[4]||'', serialNumber: r[13]||'', rowIndex: i + 2 }));
 
         const exp = [], arr = [], comp = [];
         all.forEach(row => {
@@ -574,143 +630,107 @@ async function loadJobs() {
             const hasSerial = row.serialNumber && row.serialNumber.trim() !== '';
             if (String(row.packReceived).toUpperCase().startsWith('EXP')) {
                 const ed = parseExpectedDate(row.packReceived);
-                if (ed && ed <= today) {
-                    if (hasSerial) comp.push({ ...row, type: 'completed' });
-                    else arr.push({ ...row, receivedDate: ed, type: 'current' });
-                } else exp.push({ ...row, expectedDate: ed, type: 'expected' });
-            } else {
-                if (hasSerial) comp.push({ ...row, type: 'completed' });
-                else arr.push({ ...row, receivedDate: parseDateFromSheet(row.packReceived), type: 'current' });
-            }
+                if (ed && ed <= today) { if (hasSerial) comp.push({...row, type:'completed'}); else arr.push({...row, receivedDate: ed, type:'current'}); }
+                else exp.push({...row, expectedDate: ed, type:'expected'});
+            } else { if (hasSerial) comp.push({...row, type:'completed'}); else arr.push({...row, receivedDate: parseDateFromSheet(row.packReceived), type:'current'}); }
         });
-
-        expectedJobs = exp.sort((a, b) => (a.expectedDate && b.expectedDate) ? a.expectedDate - b.expectedDate : 0);
-        currentJobs = arr.sort((a, b) => a.jobNumber.localeCompare(b.jobNumber));
-        completedJobs = comp.sort((a, b) => b.jobNumber.localeCompare(a.jobNumber));
+        expectedJobs = exp.sort((a,b) => (a.expectedDate&&b.expectedDate) ? a.expectedDate-b.expectedDate : 0);
+        currentJobs = arr.sort((a,b) => a.jobNumber.localeCompare(b.jobNumber));
+        completedJobs = comp.sort((a,b) => b.jobNumber.localeCompare(a.jobNumber));
         allJobs = [...currentJobs, ...expectedJobs, ...completedJobs];
 
         document.getElementById('currentCount').textContent = currentJobs.length;
         document.getElementById('expectedCount').textContent = expectedJobs.length;
         document.getElementById('completedCount').textContent = completedJobs.length;
-
-        const due = currentJobs.filter(j => {
-            if (!j.receivedDate) return false;
-            const rd = new Date(j.receivedDate); rd.setHours(0,0,0,0);
-            return rd.getTime() === today.getTime();
-        }).length;
+        const due = currentJobs.filter(j => { if (!j.receivedDate) return false; const rd = new Date(j.receivedDate); rd.setHours(0,0,0,0); return rd.getTime() === today.getTime(); }).length;
         document.getElementById('statToday').textContent = due;
         document.getElementById('statCurrent').textContent = currentJobs.length;
         document.getElementById('statCompleted').textContent = completedJobs.length;
-
         showTodayJobs();
-    } catch (err) {
-        console.error(err);
-        document.getElementById('loadingJobs').innerHTML = '<div class="error-message">Error loading jobs. Refresh the page.</div>';
-    }
+
+        // Generate next job number from loaded data
+        generateNextJobNumber();
+    } catch (err) { console.error(err); document.getElementById('loadingJobs').innerHTML = '<div class="error-message">Error loading jobs. Refresh the page.</div>'; }
 }
 
+// ============ JOB NUMBER GENERATION ============
+function generateNextJobNumber() {
+    const now = new Date();
+    const mm = String(now.getMonth() + 1).padStart(2, '0'); // 04, 05, ..., 12
+    const prefix = 'S' + mm;
+
+    // Find highest sequence number for current month
+    let maxSeq = 0;
+    cachedRows.forEach(row => {
+        const job = (row[0] || '').trim().toUpperCase();
+        if (job.startsWith(prefix.toUpperCase())) {
+            const seqStr = job.substring(prefix.length);
+            const seq = parseInt(seqStr);
+            if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+        }
+    });
+
+    const nextSeq = maxSeq + 1;
+    // Pad to at least 2 digits, but allow 3+ if past 99
+    const seqStr = nextSeq < 100 ? String(nextSeq).padStart(2, '0') : String(nextSeq);
+    nextJobNumber = prefix + seqStr;
+}
+
+// ============ DISPLAY FUNCTIONS ============
 function showJobTab(tab) {
     activeTab = tab;
     document.getElementById('tabCurrent').classList.toggle('active', tab === 'current');
     document.getElementById('tabExpected').classList.toggle('active', tab === 'expected');
     document.getElementById('tabCompleted').classList.toggle('active', tab === 'completed');
-    document.getElementById('dateFilter').value = '';
-    document.getElementById('searchJob').value = '';
-    if (tab === 'current') displayJobs(currentJobs);
-    else if (tab === 'expected') displayExpectedJobs(expectedJobs);
-    else displayCompletedJobs(completedJobs);
+    document.getElementById('dateFilter').value = ''; document.getElementById('searchJob').value = '';
+    if (tab === 'current') displayJobs(currentJobs); else if (tab === 'expected') displayExpectedJobs(expectedJobs); else displayCompletedJobs(completedJobs);
 }
 function displayJobs(jobs) {
-    const list = document.getElementById('jobList');
-    const count = document.getElementById('jobCount');
-    list.innerHTML = '';
-    if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No jobs found.</p>'; count.textContent=''; return; }
+    const list = document.getElementById('jobList'), count = document.getElementById('jobCount');
+    list.innerHTML = ''; if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No jobs found.</p>'; count.textContent=''; return; }
     count.textContent = `Showing ${jobs.length} job${jobs.length !== 1 ? 's' : ''}`;
     const today = new Date(); today.setHours(0,0,0,0);
     jobs.forEach(job => {
         let cls = '', label = '';
-        if (job.receivedDate) {
-            const rd = new Date(job.receivedDate); rd.setHours(0,0,0,0);
-            if (rd.getTime() === today.getTime()) { cls = 'repair-today'; label = '📦 DUE TODAY'; }
-        }
-        const card = document.createElement('div');
-        card.className = 'job-card ' + cls;
-        card.innerHTML = `
-            <div class="job-card-number">${job.jobNumber}</div>
-            <div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div>
-            <div style="font-size:14px;color:#999;margin-top:5px;">${job.packReceived ? 'Due: ' + job.packReceived : ''}</div>
-            ${label ? `<div style="font-weight:700;margin-top:8px;color:#155724;background:#d4edda;padding:8px;border-radius:6px;text-align:center;">${label}</div>` : ''}
-        `;
-        card.onclick = () => selectJob(job);
-        list.appendChild(card);
+        if (job.receivedDate) { const rd = new Date(job.receivedDate); rd.setHours(0,0,0,0); if (rd.getTime() === today.getTime()) { cls = 'repair-today'; label = '📦 DUE TODAY'; } }
+        const card = document.createElement('div'); card.className = 'job-card ' + cls;
+        card.innerHTML = `<div class="job-card-number">${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div><div style="font-size:14px;color:#999;margin-top:5px;">${job.packReceived ? 'Due: ' + job.packReceived : ''}</div>${label ? `<div style="font-weight:700;margin-top:8px;color:#155724;background:#d4edda;padding:8px;border-radius:6px;text-align:center;">${label}</div>` : ''}`;
+        card.onclick = () => selectJob(job); list.appendChild(card);
     });
 }
 function displayExpectedJobs(jobs) {
-    const list = document.getElementById('jobList');
-    const count = document.getElementById('jobCount');
-    list.innerHTML = '';
-    if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No expected arrivals.</p>'; count.textContent=''; return; }
+    const list = document.getElementById('jobList'), count = document.getElementById('jobCount');
+    list.innerHTML = ''; if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No expected arrivals.</p>'; count.textContent=''; return; }
     count.textContent = `Showing ${jobs.length} expected arrival${jobs.length !== 1 ? 's' : ''}`;
     jobs.forEach(job => {
-        const cat = getDateCategory(job.expectedDate);
-        let cls = '', label = '';
-        if (cat === 'today') { cls = 'expected-today'; label = '📦 Arriving TODAY'; }
-        else if (cat === 'tomorrow') { cls = 'expected-tomorrow'; label = '📅 Arriving TOMORROW'; }
-        else if (cat === 'soon') { cls = 'expected-soon'; label = '🔜 Arriving This Week'; }
-        const card = document.createElement('div');
-        card.className = 'job-card ' + cls;
-        card.style.cursor = 'default';
-        card.innerHTML = `
-            <div class="job-card-number">${job.jobNumber}</div>
-            <div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div>
-            <div style="font-size:14px;color:#666;margin-top:5px;">Expected: ${job.packReceived}</div>
-            ${label ? `<div style="font-weight:600;margin-top:8px;color:#333;">${label}</div>` : ''}
-        `;
+        const cat = getDateCategory(job.expectedDate); let cls = '', label = '';
+        if (cat === 'today') { cls = 'expected-today'; label = '📦 Arriving TODAY'; } else if (cat === 'tomorrow') { cls = 'expected-tomorrow'; label = '📅 Arriving TOMORROW'; } else if (cat === 'soon') { cls = 'expected-soon'; label = '🔜 Arriving This Week'; }
+        const card = document.createElement('div'); card.className = 'job-card ' + cls; card.style.cursor = 'default';
+        card.innerHTML = `<div class="job-card-number">${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div><div style="font-size:14px;color:#666;margin-top:5px;">Expected: ${job.packReceived}</div>${label ? `<div style="font-weight:600;margin-top:8px;color:#333;">${label}</div>` : ''}`;
         list.appendChild(card);
     });
 }
 function displayCompletedJobs(jobs) {
-    const list = document.getElementById('jobList');
-    const count = document.getElementById('jobCount');
-    list.innerHTML = '';
-    if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No completed repairs yet.</p>'; count.textContent=''; return; }
+    const list = document.getElementById('jobList'), count = document.getElementById('jobCount');
+    list.innerHTML = ''; if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No completed repairs yet.</p>'; count.textContent=''; return; }
     count.textContent = `Showing ${jobs.length} completed repair${jobs.length !== 1 ? 's' : ''}`;
     jobs.forEach(job => {
-        const card = document.createElement('div');
-        card.className = 'job-card repair-completed';
-        card.innerHTML = `
-            <div class="job-card-number">✓ ${job.jobNumber}</div>
-            <div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div>
-            <div style="font-size:14px;color:#999;margin-top:5px;">Serial: ${job.serialNumber}</div>
-            <div style="font-size:14px;color:#28a745;margin-top:5px;font-weight:600;">COMPLETED</div>
-        `;
-        card.onclick = () => selectJob(job);
-        list.appendChild(card);
+        const card = document.createElement('div'); card.className = 'job-card repair-completed';
+        card.innerHTML = `<div class="job-card-number">✓ ${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div><div style="font-size:14px;color:#999;margin-top:5px;">Serial: ${job.serialNumber}</div><div style="font-size:14px;color:#28a745;margin-top:5px;font-weight:600;">COMPLETED</div>`;
+        card.onclick = () => selectJob(job); list.appendChild(card);
     });
 }
 function filterJobs() {
-    const df = document.getElementById('dateFilter').value;
-    const st = document.getElementById('searchJob').value.toUpperCase().trim();
+    const df = document.getElementById('dateFilter').value, st = document.getElementById('searchJob').value.toUpperCase().trim();
     let list = activeTab === 'current' ? currentJobs : activeTab === 'expected' ? expectedJobs : completedJobs;
     if (st) list = list.filter(j => j.jobNumber.toUpperCase().includes(st));
-    if (df && activeTab === 'current') {
-        list = list.filter(j => {
-            const pd = parseDateFromSheet(j.packReceived);
-            return pd && pd.toDateString() === new Date(df).toDateString();
-        });
-    }
-    if (activeTab === 'current') displayJobs(list);
-    else if (activeTab === 'expected') displayExpectedJobs(list);
-    else displayCompletedJobs(list);
+    if (df && activeTab === 'current') list = list.filter(j => { const pd = parseDateFromSheet(j.packReceived); return pd && pd.toDateString() === new Date(df).toDateString(); });
+    if (activeTab === 'current') displayJobs(list); else if (activeTab === 'expected') displayExpectedJobs(list); else displayCompletedJobs(list);
 }
-function showAllJobs() {
-    document.getElementById('dateFilter').value = '';
-    document.getElementById('searchJob').value = '';
-    showJobTab(activeTab);
-}
+function showAllJobs() { document.getElementById('dateFilter').value = ''; document.getElementById('searchJob').value = ''; showJobTab(activeTab); }
 function showTodayJobs() { showJobTab('current'); }
 
-// ============ JOB SELECT / RESET ============
+// ============ REPAIR FORM: SELECT / RESET / SUBMIT ============
 function selectJob(job) {
     currentJobData = job;
     document.getElementById('currentJobNumber').textContent = job.jobNumber;
@@ -718,8 +738,7 @@ function selectJob(job) {
     document.getElementById('currentCustomerAddress').textContent = job.customerAddress || '';
     document.getElementById('jobSelector').classList.add('hidden');
     document.getElementById('repairForm').classList.remove('hidden');
-    resetForm();
-    initReceivedDate();
+    resetForm(); initReceivedDate();
     const hasDraft = loadDraft(job.jobNumber);
     if (!hasDraft) showPage(1);
     window.scrollTo(0, 0);
@@ -732,8 +751,7 @@ function resetForm() {
     document.getElementById('successMessage').classList.add('hidden');
     document.getElementById('errorMessage').classList.add('hidden');
     document.getElementById('invoiceRow').classList.remove('show');
-    serialDigitsValue = '';
-    updateSerialDisplay();
+    serialDigitsValue = ''; updateSerialDisplay();
     document.getElementById('receivedPack').checked = true;
     document.querySelector('#receivedPack').closest('.checkbox-item').classList.add('checked');
 }
@@ -742,118 +760,227 @@ function backToJobSelector() {
     document.getElementById('jobSelector').classList.remove('hidden');
     resetForm(); showPage(1);
 }
-
-// ============ DATA COLLECTION ============
 function collectFormData() {
-    const hasCharger = document.getElementById('receivedCharger').checked;
-    const hasLeads = document.getElementById('receivedLeads').checked;
+    const hc = document.getElementById('receivedCharger').checked, hl = document.getElementById('receivedLeads').checked;
     const partIds = ['partCircuitBoard','partFrontCase','partRearCase','partNegSocket','partPosSocket','partCigLighter','partDCSocket','partTestButton','partM2M','partNewPack'];
     const partKeys = ['circuitBoard','frontCase','rearCase','negSocket','posSocket','cigLighter','dcSocket','testButton','m2m','newPack'];
-    const parts = {};
-    partIds.forEach((id, i) => parts[partKeys[i]] = document.getElementById(id).checked);
-
+    const parts = {}; partIds.forEach((id, i) => parts[partKeys[i]] = document.getElementById(id).checked);
     const cat = getPF('category');
     return {
+        action: 'repair',
         jobNumber: currentJobData.jobNumber,
-        receivedDate: document.getElementById('receivedDate').value,     // col E
-        popDate: document.getElementById('popDate').value,                // col L
-        serialNumber: document.getElementById('serialPrefix').value + serialDigitsValue, // col N
-        batteryMake: getPF('batteryMake'),                                // col P
-        packTest: getPF('packTest'),                                      // col V
-        chargerReceived: hasCharger,
-        chargerType: hasCharger ? getPF('chargerType') : 'NONE',          // col W
-        chargerTest: hasCharger ? getPF('chargerTest') : '',              // col X
-        leadsReceived: hasLeads,
-        clampsReceived: hasLeads ? 'BOTH' : 'NONE',                       // col Y
-        leadsTest: hasLeads ? getPF('leadsTest') : 'NONE',                // col Z
-        category: cat,                                                     // col AA + AG
-        invoiceNumber: cat === 'PAID' ? document.getElementById('invoiceNumber').value : '', // col AB
-        dateReturned: todayISO(),                                          // col AD
-        returnTracking: document.getElementById('fedexTracking').value,   // col AE
-        panelSockets: getPF('panelSockets'),
-        lightsState: getPF('lightsState'),
-        parts: parts                                                       // cols AL-AU
+        receivedDate: document.getElementById('receivedDate').value,
+        popDate: document.getElementById('popDate').value,
+        serialNumber: document.getElementById('serialPrefix').value + serialDigitsValue,
+        batteryMake: getPF('batteryMake'), packTest: getPF('packTest'),
+        chargerReceived: hc, chargerType: hc ? getPF('chargerType') : 'NONE', chargerTest: hc ? getPF('chargerTest') : '',
+        leadsReceived: hl, clampsReceived: hl ? 'BOTH' : 'NONE', leadsTest: hl ? getPF('leadsTest') : 'NONE',
+        category: cat, invoiceNumber: cat === 'PAID' ? document.getElementById('invoiceNumber').value : '',
+        dateReturned: todayISO(), returnTracking: document.getElementById('fedexTracking').value,
+        panelSockets: getPF('panelSockets'), lightsState: getPF('lightsState'), parts
     };
+}
+function submitForm() {
+    if (!SERVICE_SCRIPT_URL) { alert('⚠️ Apps Script URL not configured yet.'); return; }
+    const data = collectFormData(); const btn = document.querySelector('.btn-submit'); const orig = btn.textContent;
+    btn.textContent = 'Saving...'; btn.disabled = true;
+    fetch(SERVICE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(data) })
+    .then(() => { document.getElementById('successMessage').classList.remove('hidden'); deleteDraft(data.jobNumber); window.scrollTo(0,0); alert('Repair record saved!'); btn.textContent = orig; btn.disabled = false; setTimeout(() => { backToJobSelector(); loadJobs(); }, 1500); })
+    .catch(err => { document.getElementById('errorMessage').textContent = 'Error: ' + err.message; document.getElementById('errorMessage').classList.remove('hidden'); btn.textContent = orig; btn.disabled = false; window.scrollTo(0,0); });
 }
 
 // ============ DRAFTS ============
 function saveDraft() {
     if (!currentJobData) return;
-    const draft = { jobNumber: currentJobData.jobNumber, currentPage, formData: collectFormData(), serialDigitsValue, timestamp: new Date().toISOString() };
-    localStorage.setItem(`draft_${currentJobData.jobNumber}`, JSON.stringify(draft));
-    alert('✅ Draft saved!\n\nResume from the job list when ready.');
-    backToJobSelector();
+    localStorage.setItem(`draft_${currentJobData.jobNumber}`, JSON.stringify({ jobNumber: currentJobData.jobNumber, currentPage, formData: collectFormData(), serialDigitsValue, timestamp: new Date().toISOString() }));
+    alert('✅ Draft saved!'); backToJobSelector();
 }
 function loadDraft(jobNumber) {
-    const raw = localStorage.getItem(`draft_${jobNumber}`);
-    if (!raw) return false;
+    const raw = localStorage.getItem(`draft_${jobNumber}`); if (!raw) return false;
     const d = JSON.parse(raw);
     if (!confirm(`📋 Draft found from ${new Date(d.timestamp).toLocaleString()}\n\nResume?`)) return false;
-    restoreFormData(d.formData, d.serialDigitsValue || '');
-    showPage(d.currentPage);
-    return true;
+    restoreFormData(d.formData, d.serialDigitsValue || ''); showPage(d.currentPage); return true;
 }
-function deleteDraft(jobNumber) { localStorage.removeItem(`draft_${jobNumber}`); }
+function deleteDraft(jn) { localStorage.removeItem(`draft_${jn}`); }
 function restoreFormData(d, serial) {
-    if (d.receivedDate) {
-        document.getElementById('receivedDate').value = d.receivedDate;
-        document.getElementById('receivedDateDisplay').textContent = d.receivedDate === todayISO() ? `Today (${formatDateUK(d.receivedDate)})` : formatDateUK(d.receivedDate);
-    }
+    if (d.receivedDate) { document.getElementById('receivedDate').value = d.receivedDate; document.getElementById('receivedDateDisplay').textContent = d.receivedDate === todayISO() ? `Today (${formatDateUK(d.receivedDate)})` : formatDateUK(d.receivedDate); }
     const ticks = { receivedPack: true, receivedLeads: !!d.leadsReceived, receivedCharger: !!d.chargerReceived };
-    Object.entries(ticks).forEach(([id, v]) => {
-        const cb = document.getElementById(id);
-        cb.checked = v;
-        cb.closest('.checkbox-item').classList.toggle('checked', v);
-    });
-    [['chargerTest', d.chargerTest], ['chargerType', d.chargerType], ['leadsTest', d.leadsTest], ['panelSockets', d.panelSockets], ['lightsState', d.lightsState], ['batteryMake', d.batteryMake], ['packTest', d.packTest], ['category', d.category]].forEach(([g, v]) => {
-        if (!v || v === 'NONE') return;
-        const el = document.querySelector(`[data-pf="${g}"][data-val="${v}"]`);
-        if (el) selectPF(el);
-    });
-    if (d.serialNumber) {
-        const prefix = d.serialNumber.startsWith('DZ1H') ? 'DZ1H' : 'NA';
-        document.getElementById('serialPrefix').value = prefix;
-        serialDigitsValue = serial || d.serialNumber.substring(prefix.length);
-        updateSerialDisplay();
-    }
+    Object.entries(ticks).forEach(([id, v]) => { const cb = document.getElementById(id); cb.checked = v; cb.closest('.checkbox-item').classList.toggle('checked', v); });
+    [['chargerTest',d.chargerTest],['chargerType',d.chargerType],['leadsTest',d.leadsTest],['panelSockets',d.panelSockets],['lightsState',d.lightsState],['batteryMake',d.batteryMake],['packTest',d.packTest],['category',d.category]].forEach(([g,v]) => { if (!v||v==='NONE') return; const el = document.querySelector(`[data-pf="${g}"][data-val="${v}"]`); if (el) selectPF(el); });
+    if (d.serialNumber) { const pfx = d.serialNumber.startsWith('DZ1H') ? 'DZ1H' : 'NA'; document.getElementById('serialPrefix').value = pfx; serialDigitsValue = serial || d.serialNumber.substring(pfx.length); updateSerialDisplay(); }
     if (d.popDate) document.getElementById('popDate').value = d.popDate;
     if (d.invoiceNumber) document.getElementById('invoiceNumber').value = d.invoiceNumber;
     if (d.returnTracking) document.getElementById('fedexTracking').value = d.returnTracking;
     toggleInvoiceField();
-    if (d.parts) {
-        const map = { circuitBoard:'partCircuitBoard', frontCase:'partFrontCase', rearCase:'partRearCase', negSocket:'partNegSocket', posSocket:'partPosSocket', cigLighter:'partCigLighter', dcSocket:'partDCSocket', testButton:'partTestButton', m2m:'partM2M', newPack:'partNewPack' };
-        Object.entries(d.parts).forEach(([k, v]) => {
-            const id = map[k]; if (!id) return;
-            const cb = document.getElementById(id);
-            cb.checked = !!v;
-            cb.closest('.checkbox-item').classList.toggle('checked', !!v);
+    if (d.parts) { const map = {circuitBoard:'partCircuitBoard',frontCase:'partFrontCase',rearCase:'partRearCase',negSocket:'partNegSocket',posSocket:'partPosSocket',cigLighter:'partCigLighter',dcSocket:'partDCSocket',testButton:'partTestButton',m2m:'partM2M',newPack:'partNewPack'}; Object.entries(d.parts).forEach(([k,v]) => { const id = map[k]; if (!id) return; const cb = document.getElementById(id); cb.checked = !!v; cb.closest('.checkbox-item').classList.toggle('checked', !!v); }); }
+}
+
+// ============ BOOKING PORTAL ============
+function openBookingPortal() {
+    document.getElementById('jobSelector').classList.add('hidden');
+    document.getElementById('bookingPortal').classList.remove('hidden');
+    document.getElementById('bookingJobNumber').textContent = nextJobNumber || '—';
+    document.getElementById('bookingCallDate').textContent = formatDateUK(todayISO());
+    document.getElementById('bookingSuccess').classList.add('hidden');
+    document.getElementById('bookingError').classList.add('hidden');
+    document.getElementById('bookingValidation').classList.remove('show');
+    // Reset form fields
+    ['bkCustomerName','bkPostcode','bkAddress','bkPostcodeFinal','bkPhone','bkEmail','bkFault'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('bkPickupDate').value = '';
+    document.getElementById('addressResults').classList.add('hidden');
+    bookingPackCount = 1;
+    document.querySelectorAll('.pack-count-btn').forEach(b => b.classList.toggle('selected', b.dataset.packs === '1'));
+    document.getElementById('packWeightDisplay').textContent = 'Shipment weight: 10 kg';
+    window.scrollTo(0, 0);
+}
+
+function closeBookingPortal() {
+    document.getElementById('bookingPortal').classList.add('hidden');
+    document.getElementById('jobSelector').classList.remove('hidden');
+}
+
+// Pack count selector
+function selectPackCount(el) {
+    document.querySelectorAll('.pack-count-btn').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+    bookingPackCount = parseInt(el.dataset.packs);
+    document.getElementById('packWeightDisplay').textContent = `Shipment weight: ${bookingPackCount * 10} kg`;
+}
+
+// Email suffix quick-tap
+function appendEmailSuffix(suffix) {
+    const input = document.getElementById('bkEmail');
+    const val = input.value.trim();
+    // If there's already an @, replace everything from @ onwards
+    const atIndex = val.indexOf('@');
+    if (atIndex >= 0) {
+        input.value = val.substring(0, atIndex) + suffix;
+    } else {
+        input.value = val + suffix;
+    }
+    input.focus();
+}
+
+// ============ POSTCODE LOOKUP (getAddress.io) ============
+async function lookupPostcode() {
+    const postcode = document.getElementById('bkPostcode').value.trim().replace(/\s/g, '');
+    if (!postcode) { alert('Please enter a postcode.'); return; }
+
+    if (!GETADDRESS_API_KEY) {
+        alert('⚠️ getAddress.io API key not configured.\n\nYou can still type the address manually.');
+        document.getElementById('bkPostcodeFinal').value = document.getElementById('bkPostcode').value.trim().toUpperCase();
+        return;
+    }
+
+    try {
+        const url = `https://api.getAddress.io/find/${encodeURIComponent(postcode)}?api-key=${GETADDRESS_API_KEY}&expand=true`;
+        const res = await fetch(url);
+
+        if (!res.ok) {
+            if (res.status === 404) alert('Postcode not found. Please check and try again.');
+            else if (res.status === 401) alert('API key invalid. Check your getAddress.io API key.');
+            else alert('Error looking up postcode. Please enter address manually.');
+            return;
+        }
+
+        const data = await res.json();
+        const select = document.getElementById('addressSelect');
+        select.innerHTML = '<option value="">— Select an address —</option>';
+
+        data.addresses.forEach((addr, i) => {
+            // Build a clean address string from the expanded fields
+            const parts = [addr.line_1, addr.line_2, addr.line_3, addr.line_4, addr.town_or_city, addr.county].filter(p => p && p.trim());
+            const fullAddr = parts.join(', ');
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = fullAddr;
+            opt.dataset.address = fullAddr;
+            select.appendChild(opt);
         });
+
+        document.getElementById('addressResults').classList.remove('hidden');
+        document.getElementById('bkPostcodeFinal').value = (data.postcode || postcode).toUpperCase();
+
+    } catch (err) {
+        console.error(err);
+        alert('Error connecting to address lookup. Please enter address manually.');
     }
 }
 
-// ============ SUBMIT ============
-function submitForm() {
-    if (!SERVICE_SCRIPT_URL) {
-        alert('⚠️ Apps Script URL not configured yet.\n\nEdit index.html and set SERVICE_SCRIPT_URL.');
+function selectAddress() {
+    const select = document.getElementById('addressSelect');
+    const opt = select.options[select.selectedIndex];
+    if (opt && opt.dataset.address) {
+        document.getElementById('bkAddress').value = opt.dataset.address;
+    }
+}
+
+// ============ BOOKING SUBMIT ============
+function validateBooking() {
+    const name = document.getElementById('bkCustomerName').value.trim();
+    const address = document.getElementById('bkAddress').value.trim();
+    const postcode = document.getElementById('bkPostcodeFinal').value.trim();
+    const phone = document.getElementById('bkPhone').value.trim();
+    const email = document.getElementById('bkEmail').value.trim();
+    const pickup = document.getElementById('bkPickupDate').value;
+    return name && address && postcode && phone && email && pickup;
+}
+
+function submitBooking() {
+    if (!validateBooking()) {
+        document.getElementById('bookingValidation').classList.add('show');
         return;
     }
-    const data = collectFormData();
-    const btn = document.querySelector('.btn-submit');
-    const orig = btn.textContent;
+    document.getElementById('bookingValidation').classList.remove('show');
+
+    if (!SERVICE_SCRIPT_URL) {
+        alert('⚠️ Apps Script URL not configured yet.\n\nThe booking cannot be saved until SERVICE_SCRIPT_URL is set.');
+        return;
+    }
+
+    // Calculate EXP date: pickup date + 1 day
+    const pickupISO = document.getElementById('bkPickupDate').value;
+    const pickupDate = new Date(pickupISO);
+    const expDate = new Date(pickupDate);
+    expDate.setDate(expDate.getDate() + 1);
+    const expDD = String(expDate.getDate()).padStart(2, '0');
+    const expMM = String(expDate.getMonth() + 1).padStart(2, '0');
+    const expStr = `EXP ${expDD}/${expMM}`;
+
+    const bookingData = {
+        action: 'booking',
+        jobNumber: nextJobNumber,
+        callDate: formatDateUK(todayISO()),         // col D
+        packReceived: expStr,                         // col E
+        customerName: document.getElementById('bkCustomerName').value.trim(),  // col F
+        customerAddress: document.getElementById('bkAddress').value.trim(),    // col G
+        postcode: document.getElementById('bkPostcodeFinal').value.trim().toUpperCase(), // col H
+        phone: document.getElementById('bkPhone').value.trim(),               // col I
+        email: document.getElementById('bkEmail').value.trim(),               // col J
+        fault: document.getElementById('bkFault').value.trim(),               // col K
+        packCount: bookingPackCount,
+        pickupDate: formatDateUK(pickupISO)
+    };
+
+    const btn = document.getElementById('bookingSubmitBtn');
     btn.textContent = 'Saving...'; btn.disabled = true;
-    fetch(SERVICE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(data) })
-    .then(() => {
-        document.getElementById('successMessage').classList.remove('hidden');
-        document.getElementById('errorMessage').classList.add('hidden');
-        deleteDraft(data.jobNumber);
+
+    fetch(SERVICE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(bookingData) })
+    .then(res => res.json())
+    .then(result => {
+        document.getElementById('bookingSuccess').classList.remove('hidden');
+        document.getElementById('bookingError').classList.add('hidden');
         window.scrollTo(0, 0);
-        alert('Repair record saved!');
-        btn.textContent = orig; btn.disabled = false;
-        setTimeout(() => { backToJobSelector(); loadJobs(); }, 1500);
-    }).catch(err => {
-        document.getElementById('errorMessage').textContent = 'Error saving: ' + err.message;
-        document.getElementById('errorMessage').classList.remove('hidden');
-        btn.textContent = orig; btn.disabled = false;
+        alert(`✅ Booking saved!\n\nJob Number: ${nextJobNumber}\nExpected arrival: ${expStr}\n\nThe job has been added to the sheet.`);
+        btn.textContent = 'Save Booking to Sheet'; btn.disabled = false;
+
+        // Reload jobs and return to job selector
+        setTimeout(() => { closeBookingPortal(); loadJobs(); }, 1500);
+    })
+    .catch(err => {
+        document.getElementById('bookingError').textContent = 'Error saving booking: ' + err.message;
+        document.getElementById('bookingError').classList.remove('hidden');
+        btn.textContent = 'Save Booking to Sheet'; btn.disabled = false;
         window.scrollTo(0, 0);
     });
 }
