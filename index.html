@@ -257,7 +257,7 @@ textarea { resize: vertical; min-height: 80px; }
 
             <div class="form-group"><label for="bkPickupDate">Collection Date <span class="sub-label">(UPS pickup from customer)</span></label><input type="date" id="bkPickupDate"></div>
 
-            <div class="validation-msg" id="bookingValidation">Please fill in all required fields: name, address, postcode, phone, email, and pickup date.</div>
+            <div class="validation-msg" id="bookingValidation">Please fill in all required fields: name, street address, town/city, postcode, phone, email, and pickup date.</div>
 
             <div class="navigation-buttons">
                 <button type="button" class="btn btn-submit" onclick="submitBookingAndUPS()" id="bookingSubmitBtn">Book Repair, Generate Label & Schedule Pickup</button>
@@ -828,7 +828,7 @@ function selectAddress() { const opt=document.getElementById('addressSelect').op
 
 // ============ BOOKING + UPS (combined) ============
 function validateBooking() {
-    return document.getElementById('bkCustomerName').value.trim() && document.getElementById('bkAddress').value.trim() && document.getElementById('bkPostcodeFinal').value.trim() && document.getElementById('bkPhone').value.trim() && document.getElementById('bkEmail').value.trim() && document.getElementById('bkPickupDate').value;
+    return document.getElementById('bkCustomerName').value.trim() && document.getElementById('bkAddress').value.trim() && document.getElementById('bkCity').value.trim() && document.getElementById('bkPostcodeFinal').value.trim() && document.getElementById('bkPhone').value.trim() && document.getElementById('bkEmail').value.trim() && document.getElementById('bkPickupDate').value;
 }
 
 async function submitBookingAndUPS() {
