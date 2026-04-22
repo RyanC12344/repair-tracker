@@ -151,6 +151,75 @@ textarea { resize: vertical; min-height: 80px; }
 
 /* Rebook modal */
 .rebook-section { padding: 30px; }
+
+/* ============ TOASTS ============ */
+.toast-container {
+    position: fixed; top: 20px; right: 20px; z-index: 10000;
+    display: flex; flex-direction: column; gap: 10px;
+    max-width: calc(100vw - 40px); pointer-events: none;
+}
+.toast {
+    background: #1a2332; color: white;
+    padding: 14px 18px; border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    font-size: 15px; font-weight: 500; line-height: 1.4;
+    min-width: 280px; max-width: 420px;
+    pointer-events: auto; cursor: pointer;
+    display: flex; align-items: center; gap: 12px;
+    animation: toastIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+    border-left: 4px solid #6c757d;
+}
+.toast.leaving { animation: toastOut 0.25s ease-in forwards; }
+.toast-icon {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px; background: rgba(255,255,255,0.2);
+}
+.toast-msg { flex: 1; word-break: break-word; }
+.toast.success { background: #1e6e38; border-left-color: #28a745; }
+.toast.error   { background: #8a2230; border-left-color: #dc3545; }
+.toast.warning { background: #8a6d1f; border-left-color: #ffc107; }
+.toast.info    { background: #1a5c6b; border-left-color: #17a2b8; }
+@keyframes toastIn  { from { transform: translateX(calc(100% + 30px)); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes toastOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(calc(100% + 30px)); opacity: 0; } }
+@media (max-width: 600px) {
+    .toast-container { top: 10px; right: 10px; left: 10px; }
+    .toast { min-width: 0; max-width: none; font-size: 14px; }
+}
+
+/* ============ BUTTON SPINNER ============ */
+.btn-spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid currentColor; border-right-color: transparent;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    vertical-align: -2px; margin-right: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============ CUSTOM CONFIRM DIALOG ============ */
+.confirm-overlay {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
+    z-index: 10001; display: flex; align-items: center; justify-content: center;
+    padding: 20px; animation: fadeIn 0.18s;
+}
+.confirm-box {
+    background: white; border-radius: 12px; padding: 28px;
+    max-width: 440px; width: 100%;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    animation: confirmIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.confirm-title { font-size: 18px; font-weight: 700; color: #1a2332; margin-bottom: 10px; }
+.confirm-message { color: #495057; font-size: 15px; line-height: 1.5; margin-bottom: 22px; white-space: pre-wrap; }
+.confirm-buttons { display: flex; gap: 10px; justify-content: flex-end; }
+.confirm-btn { padding: 11px 22px; border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+.confirm-btn-cancel { background: #e9ecef; color: #495057; }
+.confirm-btn-cancel:hover { background: #dee2e6; }
+.confirm-btn-ok { background: #28a745; color: white; }
+.confirm-btn-ok:hover { background: #218838; }
+.confirm-btn-ok.dangerous { background: #c41e3a; }
+.confirm-btn-ok.dangerous:hover { background: #a01729; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes confirmIn { from { transform: translateY(-12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 </style>
 </head>
 <body>
@@ -636,6 +705,114 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 45000) {
     }
 }
 
+// ============ UI HELPERS (toasts, confirm, loading states) ============
+
+// showToast('Saved!', 'success') — types: success, error, warning, info
+function showToast(message, type = 'info', duration = 3500) {
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + type;
+    const icons = { success: '✓', error: '✕', warning: '!', info: 'i' };
+    const icon = document.createElement('span');
+    icon.className = 'toast-icon';
+    icon.textContent = icons[type] || 'i';
+    const msg = document.createElement('span');
+    msg.className = 'toast-msg';
+    msg.textContent = message;
+    toast.appendChild(icon);
+    toast.appendChild(msg);
+    container.appendChild(toast);
+
+    const dismiss = () => {
+        if (toast.parentNode) {
+            toast.classList.add('leaving');
+            setTimeout(() => toast.remove(), 260);
+        }
+    };
+    toast.addEventListener('click', dismiss);
+    setTimeout(dismiss, duration);
+}
+
+// Async replacement for window.confirm. Returns Promise<boolean>.
+// Usage: if (await confirmDialog({ title: '...', message: '...', okText: 'Yes', cancelText: 'No' })) { ... }
+function confirmDialog(options) {
+    if (typeof options === 'string') options = { message: options };
+    const {
+        title = 'Please confirm',
+        message = '',
+        okText = 'OK',
+        cancelText = 'Cancel',
+        dangerous = false
+    } = options;
+
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-overlay';
+        const box = document.createElement('div');
+        box.className = 'confirm-box';
+        const titleEl = document.createElement('div');
+        titleEl.className = 'confirm-title';
+        titleEl.textContent = title;
+        const msgEl = document.createElement('div');
+        msgEl.className = 'confirm-message';
+        msgEl.textContent = message;
+        const btns = document.createElement('div');
+        btns.className = 'confirm-buttons';
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'confirm-btn confirm-btn-cancel';
+        cancelBtn.textContent = cancelText;
+        const okBtn = document.createElement('button');
+        okBtn.className = 'confirm-btn confirm-btn-ok' + (dangerous ? ' dangerous' : '');
+        okBtn.textContent = okText;
+        btns.appendChild(cancelBtn);
+        btns.appendChild(okBtn);
+        box.appendChild(titleEl);
+        box.appendChild(msgEl);
+        box.appendChild(btns);
+        overlay.appendChild(box);
+
+        const keyHandler = (e) => {
+            if (e.key === 'Escape') close(false);
+            if (e.key === 'Enter')  close(true);
+        };
+        const close = (result) => {
+            overlay.remove();
+            document.removeEventListener('keydown', keyHandler);
+            resolve(result);
+        };
+        cancelBtn.addEventListener('click', () => close(false));
+        okBtn.addEventListener('click', () => close(true));
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
+        document.addEventListener('keydown', keyHandler);
+
+        document.body.appendChild(overlay);
+        okBtn.focus();
+    });
+}
+
+// Put a button into a loading/spinner state and restore it after.
+// setButtonLoading(btn, true, 'Saving...'); ... setButtonLoading(btn, false);
+function setButtonLoading(btn, isLoading, loadingText) {
+    if (!btn) return;
+    if (isLoading) {
+        if (!btn.dataset.originalHtml) btn.dataset.originalHtml = btn.innerHTML;
+        btn.innerHTML = `<span class="btn-spinner"></span>${loadingText || 'Working...'}`;
+        btn.disabled = true;
+    } else {
+        if (btn.dataset.originalHtml) {
+            btn.innerHTML = btn.dataset.originalHtml;
+            delete btn.dataset.originalHtml;
+        }
+        btn.disabled = false;
+    }
+}
+
 // ============ HELPERS ============
 function todayISO() { return new Date().toISOString().split('T')[0]; }
 function formatDateUK(iso) {
@@ -946,7 +1123,7 @@ function showTodayJobs() {
 }
 
 // ============ REPAIR FORM ============
-function selectJob(job) {
+async function selectJob(job) {
     currentJobData=job;
     document.getElementById('currentJobNumber').textContent=job.jobNumber;
     document.getElementById('currentCustomerName').textContent=job.customerName;
@@ -954,7 +1131,7 @@ function selectJob(job) {
     document.getElementById('jobSelector').classList.add('hidden');
     document.getElementById('repairForm').classList.remove('hidden');
     resetForm(); initReceivedDate();
-    const hasDraft=loadDraft(job.jobNumber);
+    const hasDraft = await loadDraft(job.jobNumber);
     if(!hasDraft) showPage(1);
     window.scrollTo(0,0);
 }
@@ -1000,30 +1177,31 @@ function collectFormData() {
     };
 }
 function submitForm() {
-    if(!SERVICE_SCRIPT_URL){alert('⚠️ Apps Script URL not configured.');return;}
-    const data=collectFormData(); const btn=document.querySelector('.btn-submit'); const orig=btn.textContent;
-    btn.textContent='Saving...'; btn.disabled=true;
+    if(!SERVICE_SCRIPT_URL){showToast('Apps Script URL not configured.', 'error');return;}
+    const data=collectFormData(); const btn=document.querySelector('.btn-submit');
     saveDateCodeSuggestion(dateCodeValue.toUpperCase());
+    setButtonLoading(btn, true, 'Saving...');
     fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(data)})
-    .then(()=>{document.getElementById('successMessage').classList.remove('hidden');deleteDraft(data.jobNumber);window.scrollTo(0,0);alert('Repair record saved!');btn.textContent=orig;btn.disabled=false;setTimeout(()=>{backToJobSelector();loadJobs();},1500);})
-    .catch(err=>{document.getElementById('errorMessage').textContent='Error: '+err.message;document.getElementById('errorMessage').classList.remove('hidden');btn.textContent=orig;btn.disabled=false;window.scrollTo(0,0);});
+    .then(()=>{document.getElementById('successMessage').classList.remove('hidden');deleteDraft(data.jobNumber);window.scrollTo(0,0);showToast('Repair record saved!', 'success');setButtonLoading(btn, false);setTimeout(()=>{backToJobSelector();loadJobs();},1200);})
+    .catch(err=>{document.getElementById('errorMessage').textContent='Error: '+err.message;document.getElementById('errorMessage').classList.remove('hidden');setButtonLoading(btn, false);window.scrollTo(0,0);showToast('Error saving repair: ' + err.message, 'error', 6000);});
 }
 
 // ============ DRAFTS ============
 function saveDraft() {
     if(!currentJobData) return;
     localStorage.setItem(`draft_${currentJobData.jobNumber}`,JSON.stringify({jobNumber:currentJobData.jobNumber,currentPage,formData:collectFormData(),serialDigitsValue,timestamp:new Date().toISOString()}));
-    alert('✅ Draft saved!'); backToJobSelector();
+    showToast('Draft saved.', 'success'); backToJobSelector();
 }
-function loadDraft(jn) {
+async function loadDraft(jn) {
     const raw = localStorage.getItem(`draft_${jn}`);
     if (!raw) return false;
     const d = JSON.parse(raw);
-    const resumeIt = confirm(
-        `📋 Unsaved draft found from ${new Date(d.timestamp).toLocaleString()}\n\n` +
-        `OK — Resume the draft\n` +
-        `Cancel — Discard it and start fresh`
-    );
+    const resumeIt = await confirmDialog({
+        title: 'Unsaved draft found',
+        message: `There's a saved draft from ${new Date(d.timestamp).toLocaleString()}.\n\nResume the draft, or discard it and start fresh?`,
+        okText: 'Resume draft',
+        cancelText: 'Discard'
+    });
     if (!resumeIt) {
         deleteDraft(jn);
         return false;
@@ -1177,14 +1355,20 @@ function refreshPackWeightDisplay() {
     }
 }
 
-function appendEmailSuffix(suffix) {
+async function appendEmailSuffix(suffix) {
     const input = document.getElementById('bkEmail');
     const val = input.value.trim();
     const at = val.indexOf('@');
     if (at >= 0) {
         const existingDomain = val.substring(at);
         if (existingDomain.toLowerCase() === suffix.toLowerCase()) { input.focus(); return; }
-        if (!confirm(`Replace "${existingDomain}" with "${suffix}"?`)) { input.focus(); return; }
+        const ok = await confirmDialog({
+            title: 'Replace email domain?',
+            message: `Replace "${existingDomain}" with "${suffix}"?`,
+            okText: 'Replace',
+            cancelText: 'Keep existing'
+        });
+        if (!ok) { input.focus(); return; }
         input.value = val.substring(0, at) + suffix;
     } else {
         input.value = val + suffix;
@@ -1195,8 +1379,10 @@ function appendEmailSuffix(suffix) {
 // ============ POSTCODE LOOKUP (via Apps Script proxy) ============
 async function lookupPostcode() {
     const postcode = document.getElementById('bkPostcode').value.trim();
-    if (!postcode) { alert('Please enter a postcode.'); return; }
+    if (!postcode) { showToast('Please enter a postcode.', 'warning'); return; }
 
+    const btn = document.querySelector('.postcode-lookup button');
+    setButtonLoading(btn, true, 'Finding...');
     try {
         const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
             method: 'POST',
@@ -1206,16 +1392,16 @@ async function lookupPostcode() {
         const data = await res.json();
 
         if (!data.success) {
-            alert('Address lookup error: ' + (data.error || 'unknown error') + '\n\nYou can enter the address manually.');
+            showToast('Lookup error: ' + (data.error || 'unknown') + '. Enter address manually.', 'error', 5000);
             return;
         }
         if (!data.found) {
-            if (data.reason === 'postcode_not_found') alert('Postcode not found.');
-            else alert('No addresses found for that postcode.');
+            if (data.reason === 'postcode_not_found') showToast('Postcode not found.', 'warning');
+            else showToast('No addresses found for that postcode.', 'warning');
             return;
         }
         if (!data.addresses || !data.addresses.length) {
-            alert('No addresses returned. Enter the address manually.');
+            showToast('No addresses returned. Enter manually.', 'warning');
             return;
         }
 
@@ -1236,7 +1422,9 @@ async function lookupPostcode() {
         document.getElementById('bkPostcodeFinal').value = (data.addresses[0].postcode || postcode).toUpperCase();
     } catch (err) {
         console.error(err);
-        alert('Address lookup error. Enter the address manually.');
+        showToast('Address lookup error: ' + err.message + '. Enter manually.', 'error', 5000);
+    } finally {
+        setButtonLoading(btn, false);
     }
 }
 function selectAddress() { const opt=document.getElementById('addressSelect').options[document.getElementById('addressSelect').selectedIndex]; if(opt&&opt.dataset.address) { document.getElementById('bkAddress').value=opt.dataset.street||opt.dataset.address; document.getElementById('bkCity').value=opt.dataset.city||''; } }
@@ -1273,7 +1461,7 @@ async function submitBookingAndUPS() {
     document.getElementById('bookingError').classList.add('hidden');
 
     const btn=document.getElementById('bookingSubmitBtn');
-    btn.textContent='Saving booking...'; btn.disabled=true;
+    setButtonLoading(btn, true, 'Saving booking...');
 
     const pickupISO=document.getElementById('bkPickupDate').value;
     const pickupDate=new Date(pickupISO);
@@ -1297,13 +1485,13 @@ async function submitBookingAndUPS() {
 
     try {
         // Step 1: Save booking to sheet
-        btn.textContent='Saving booking...';
+        setButtonLoading(btn, true, 'Saving booking...');
         const bookRes=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(bookingData)});
         const bookResult=await bookRes.json();
         if(!bookResult.success) throw new Error(bookResult.error||'Booking save failed');
 
         // Step 2: Generate UPS label(s) — one per box
-        btn.textContent='Generating UPS label(s)...';
+        setButtonLoading(btn, true, 'Generating UPS label(s)...');
         const boxes = bookingPackCount > 1 ? boxConfig : [bookingPackCount * 10];
         const labelResults = [];
         for (let b = 0; b < boxes.length; b++) {
@@ -1319,7 +1507,7 @@ async function submitBookingAndUPS() {
         }
 
         // Step 3: Schedule pickup
-        btn.textContent='Scheduling pickup...';
+        setButtonLoading(btn, true, 'Scheduling pickup...');
         const pickupData = {
             action:'schedulePickup', jobNumber:nextJobNumber,
             customerName, customerAddress, customerCity, customerPostcode, customerPhone,
@@ -1350,50 +1538,60 @@ async function submitBookingAndUPS() {
         `;
         document.getElementById('upsResults').classList.remove('hidden');
         document.getElementById('bookingSuccess').classList.add('hidden');
-        btn.textContent='✓ Complete'; btn.disabled=true;
+        setButtonLoading(btn, false);
+        btn.textContent = '✓ Complete';
+        btn.disabled = true;
+        showToast(`Booking ${nextJobNumber} complete — ${labelResults.length} label(s), pickup ${pickupResult.pickupConfirmation}`, 'success', 5000);
         window.scrollTo(0, document.getElementById('upsResults').offsetTop - 100);
 
     } catch(err) {
         console.error(err);
         document.getElementById('bookingError').textContent='Error: '+err.message;
         document.getElementById('bookingError').classList.remove('hidden');
-        btn.textContent='Book Repair, Generate Label & Schedule Pickup'; btn.disabled=false;
+        setButtonLoading(btn, false);
+        showToast('Booking failed: ' + err.message, 'error', 6000);
         window.scrollTo(0,0);
     }
 }
 
 // ============ SEND LABEL EMAIL ============
 async function sendLabelEmail() {
-    if(!lastBookingData||!lastUPSResult){alert('No booking data available. Please complete a booking first.');return;}
-    
-    // Show loading
+    if (!lastBookingData || !lastUPSResult) {
+        showToast('No booking data available. Please complete a booking first.', 'error');
+        return;
+    }
+
     const btn = document.querySelector('.ups-btn-send');
-    const origText = btn.textContent;
-    btn.textContent = 'Sending label...'; btn.disabled = true;
-    
+    setButtonLoading(btn, true, 'Sending label...');
+
     try {
-        const res=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
-            action:'sendEmail', jobNumber:lastBookingData.jobNumber,
-            customerName:lastBookingData.customerName, customerEmail:lastBookingData.customerEmail,
-            pickupDate:lastBookingData.pickupDate, pickupConfirmation:lastUPSResult.pickupConfirmation,
-            trackingNumber:lastUPSResult.trackingNumber
-        })}, 60000);
-        const result=await res.json();
-        if(result.success) {
-            alert(`✅ Label sent to ${lastBookingData.customerEmail}`);
+        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+                action: 'sendEmail', jobNumber: lastBookingData.jobNumber,
+                customerName: lastBookingData.customerName, customerEmail: lastBookingData.customerEmail,
+                pickupDate: lastBookingData.pickupDate, pickupConfirmation: lastUPSResult.pickupConfirmation,
+                trackingNumber: lastUPSResult.trackingNumber
+            })
+        }, 60000);
+        const result = await res.json();
+        if (result.success) {
+            showToast(`Label sent to ${lastBookingData.customerEmail}`, 'success', 4000);
             closeBookingPortal();
             loadJobs();
+        } else {
+            throw new Error(result.error);
         }
-        else throw new Error(result.error);
-    } catch(err) { 
-        alert('Error sending email: '+err.message);
-        btn.textContent = origText; btn.disabled = false;
+    } catch (err) {
+        showToast('Error sending email: ' + err.message, 'error', 6000);
+        setButtonLoading(btn, false);
     }
 }
 
 // ============ RESEND / EDIT EMAIL MODAL ============
 function openResendModal() {
-    if(!lastBookingData||!lastUPSResult){alert('No booking data available.');return;}
+    if (!lastBookingData || !lastUPSResult) { showToast('No booking data available.', 'error'); return; }
     const name=lastBookingData.customerName;
     const pickupDate=lastBookingData.pickupDate;
     const pickupRef=lastUPSResult.pickupConfirmation||'';
@@ -1406,26 +1604,31 @@ function openResendModal() {
 function closeEmailModal() { document.getElementById('emailModal').classList.add('hidden'); }
 async function sendEditedEmail() {
     const sendBtn = document.querySelector('.modal .btn-submit');
-    sendBtn.textContent = 'Sending...'; sendBtn.disabled = true;
+    setButtonLoading(sendBtn, true, 'Sending...');
     try {
-        const res=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
-            action:'resendEmail', jobNumber:lastBookingData.jobNumber,
-            customerName:lastBookingData.customerName, customerEmail:lastBookingData.customerEmail,
-            emailSubject:document.getElementById('modalSubject').value,
-            customEmailBody:document.getElementById('modalBody').value,
-            trackingNumber:lastUPSResult.trackingNumber
-        })}, 60000);
-        const result=await res.json();
-        if(result.success){
+        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+                action: 'resendEmail', jobNumber: lastBookingData.jobNumber,
+                customerName: lastBookingData.customerName, customerEmail: lastBookingData.customerEmail,
+                emailSubject: document.getElementById('modalSubject').value,
+                customEmailBody: document.getElementById('modalBody').value,
+                trackingNumber: lastUPSResult.trackingNumber
+            })
+        }, 60000);
+        const result = await res.json();
+        if (result.success) {
             closeEmailModal();
-            alert(`✅ Label sent to ${lastBookingData.customerEmail}`);
+            showToast(`Label sent to ${lastBookingData.customerEmail}`, 'success', 4000);
             closeBookingPortal();
             loadJobs();
+        } else {
+            throw new Error(result.error);
         }
-        else throw new Error(result.error);
-    } catch(err) { 
-        alert('Error sending email: '+err.message);
-        sendBtn.textContent = 'Send Email'; sendBtn.disabled = false;
+    } catch (err) {
+        showToast('Error sending email: ' + err.message, 'error', 6000);
+        setButtonLoading(sendBtn, false);
     }
 }
 
@@ -1450,60 +1653,81 @@ function selectRebookPackCount(el) {
 
 async function lookupJobForRebook() {
     const jn = document.getElementById('rbJobNumber').value.trim();
-    if (!jn) { alert('Please enter a job number.'); return; }
-    
+    if (!jn) { showToast('Please enter a job number.', 'warning'); return; }
+
     document.getElementById('rebookError').classList.add('hidden');
-    
+    const btn = document.querySelector('#rebookPortal .postcode-lookup button');
+    setButtonLoading(btn, true, 'Finding...');
+
     try {
-        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ action:'lookupJob', jobNumber: jn })});
+        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'lookupJob', jobNumber: jn })
+        }, 30000);
         const result = await res.json();
-        
+
         if (result.success && result.found) {
             document.getElementById('rbCustomerName').value = result.customerName || '';
             document.getElementById('rbAddress').value = result.customerAddress || '';
             document.getElementById('rbPostcode').value = result.postcode || '';
             document.getElementById('rbPhone').value = result.phone || '';
             // Try to extract city from address
-            const addrParts = (result.customerAddress || '').split(',').map(p=>p.trim()).filter(p=>p);
-            document.getElementById('rbCity').value = addrParts.length > 1 ? addrParts[addrParts.length-1] : '';
+            const addrParts = (result.customerAddress || '').split(',').map(p => p.trim()).filter(p => p);
+            document.getElementById('rbCity').value = addrParts.length > 1 ? addrParts[addrParts.length - 1] : '';
+            showToast(`Loaded details for ${jn}`, 'success');
         } else {
             document.getElementById('rebookError').textContent = 'Job number not found. You can enter details manually.';
             document.getElementById('rebookError').classList.remove('hidden');
         }
-    } catch(err) {
-        document.getElementById('rebookError').textContent = 'Error looking up job. You can enter details manually.';
+    } catch (err) {
+        document.getElementById('rebookError').textContent = 'Error looking up job: ' + err.message + '. Enter details manually.';
         document.getElementById('rebookError').classList.remove('hidden');
+    } finally {
+        setButtonLoading(btn, false);
     }
 }
 
 async function submitRebook() {
-    const jn=document.getElementById('rbJobNumber').value.trim();
-    const name=document.getElementById('rbCustomerName').value.trim();
-    const addr=document.getElementById('rbAddress').value.trim();
-    const city=document.getElementById('rbCity').value.trim();
-    const pc=document.getElementById('rbPostcode').value.trim();
-    const phone=document.getElementById('rbPhone').value.trim();
-    const pickup=document.getElementById('rbPickupDate').value;
-    if(!jn||!name||!addr||!pc||!pickup){alert('Please fill in all required fields.');return;}
+    const jn = document.getElementById('rbJobNumber').value.trim();
+    const name = document.getElementById('rbCustomerName').value.trim();
+    const addr = document.getElementById('rbAddress').value.trim();
+    const city = document.getElementById('rbCity').value.trim();
+    const pc = document.getElementById('rbPostcode').value.trim();
+    const phone = document.getElementById('rbPhone').value.trim();
+    const pickup = document.getElementById('rbPickupDate').value;
+    if (!jn || !name || !addr || !pc || !pickup) {
+        showToast('Please fill in all required fields.', 'warning');
+        return;
+    }
 
-    const btn=document.getElementById('rebookSubmitBtn');
-    btn.textContent='Rebooking collection...'; btn.disabled=true;
+    const btn = document.getElementById('rebookSubmitBtn');
+    setButtonLoading(btn, true, 'Rebooking...');
     try {
-        const res=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
-            action:'rebookPickup', jobNumber:jn,
-            customerName:name, customerAddress:addr, customerCity:city||addr.split(',').pop().trim(), customerPostcode:pc.toUpperCase(), customerPhone:phone,
-            packCount:rebookPackCount, pickupDateISO:pickup
-        })}, 60000);
-        const result=await res.json();
-        if(result.success){
-            alert(`✅ Collection rebooked!\n\nJob: ${jn}\nNew pickup ref: ${result.pickupConfirmation}`);
+        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+                action: 'rebookPickup', jobNumber: jn,
+                customerName: name, customerAddress: addr,
+                customerCity: city || addr.split(',').pop().trim(),
+                customerPostcode: pc.toUpperCase(), customerPhone: phone,
+                packCount: rebookPackCount, pickupDateISO: pickup
+            })
+        }, 60000);
+        const result = await res.json();
+        if (result.success) {
+            showToast(`Collection rebooked. ${jn} — ref ${result.pickupConfirmation}`, 'success', 5000);
             closeRebookPortal();
             loadJobs();
-        } else throw new Error(result.error);
-    } catch(err){
-        alert('Error rebooking: '+err.message);
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (err) {
+        showToast('Error rebooking: ' + err.message, 'error', 6000);
+    } finally {
+        setButtonLoading(btn, false);
     }
-    btn.textContent='Rebook Pickup'; btn.disabled=false;
 }
 
 // Allow Escape key to close the email modal
