@@ -582,6 +582,10 @@ textarea { resize: vertical; min-height: 80px; }
 // ============ CONFIG ============
 const SHEET_ID = '1iVCdZRmTXEfbV8_tmjomq7Cs8-za80yuW8z3QwpdXBk';
 const SERVICE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxZEMgdG1vfqT4L7HuGreb1_o8Ltrxmc5wIgYID4i_sghLa-Ey2TJhzi3Giz54qIlE10A/exec';
+// Shared secret — must match API_SECRET in Apps Script Script Properties.
+// Not a security-critical secret (the HTML is public), but it blocks drive-by bots
+// that find the webhook URL without reading the HTML.
+const API_SECRET = '87e6a7c137dc17b2978c2ff4f5af87cb98ab33be34066de8';
 // Note: Ideal Postcodes API key is stored in Apps Script Script Properties, not here.
 
 const MONTH_GIDS = { 1:null, 2:null, 3:null, 4:21700818, 5:257806692, 6:199519344, 7:0, 8:2124425478, 9:782015307, 10:1786550392, 11:330568521, 12:1114698946 };
@@ -602,7 +606,21 @@ const BOOKING_STATE_KEY = 'lastBookingState';
 
 // ============ FETCH HELPER ============
 // Wraps fetch with a timeout so hung requests don't leave the UI stuck forever.
+// Also auto-injects API_SECRET into any POST to the Apps Script URL so we don't
+// have to remember to add it at each call site.
 async function fetchWithTimeout(url, options = {}, timeoutMs = 45000) {
+    // Auto-inject API_SECRET for POSTs to our Apps Script webhook
+    if (url === SERVICE_SCRIPT_URL && options.method === 'POST' && options.body) {
+        try {
+            const parsed = JSON.parse(options.body);
+            if (parsed && typeof parsed === 'object' && !parsed.apiSecret) {
+                parsed.apiSecret = API_SECRET;
+                options = { ...options, body: JSON.stringify(parsed) };
+            }
+        } catch (_) {
+            // Body wasn't JSON — leave it alone
+        }
+    }
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -1180,11 +1198,11 @@ async function lookupPostcode() {
     if (!postcode) { alert('Please enter a postcode.'); return; }
 
     try {
-        const res = await fetch(SERVICE_SCRIPT_URL, {
+        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ action: 'lookupPostcode', postcode: postcode })
-        });
+        }, 30000);
         const data = await res.json();
 
         if (!data.success) {
