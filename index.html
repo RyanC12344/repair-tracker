@@ -287,7 +287,7 @@ textarea { resize: vertical; min-height: 80px; }
 
             <div class="form-group"><label for="bkPickupDate">Collection Date <span class="sub-label">(UPS pickup from customer)</span></label><input type="date" id="bkPickupDate"></div>
 
-            <div class="validation-msg" id="bookingValidation">Please fill in all required fields: name, street address, town/city, postcode, phone, email, and pickup date.</div>
+            <div class="validation-msg" id="bookingValidation">Please fill in all required fields: name, street address, town/city, postcode, phone, a valid email address, and pickup date.</div>
 
             <div class="navigation-buttons">
                 <button type="button" class="btn btn-submit" onclick="submitBookingAndUPS()" id="bookingSubmitBtn">Book Repair, Generate Label & Schedule Pickup</button>
@@ -598,10 +598,35 @@ let dateCodeValue = '', invoiceValue = '', trackingValue = '';
 let boxConfig = []; // array of weights for each box
 const totalPages = 5;
 const DATE_CODES_KEY = 'recentDateCodes';
+const BOOKING_STATE_KEY = 'lastBookingState';
+
+// ============ FETCH HELPER ============
+// Wraps fetch with a timeout so hung requests don't leave the UI stuck forever.
+async function fetchWithTimeout(url, options = {}, timeoutMs = 45000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const res = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(id);
+        return res;
+    } catch (err) {
+        clearTimeout(id);
+        if (err.name === 'AbortError') {
+            throw new Error(`Request timed out after ${Math.round(timeoutMs/1000)}s. Please check your connection and try again.`);
+        }
+        throw err;
+    }
+}
 
 // ============ HELPERS ============
 function todayISO() { return new Date().toISOString().split('T')[0]; }
-function formatDateUK(iso) { if (!iso) return ''; const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; }
+function formatDateUK(iso) {
+    if (!iso || typeof iso !== 'string' || !iso.includes('-')) return '';
+    const parts = iso.split('-');
+    if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return '';
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+}
 function initReceivedDate() { const iso = todayISO(); document.getElementById('receivedDate').value = iso; document.getElementById('receivedDateDisplay').textContent = `Today (${formatDateUK(iso)})`; }
 function toggleDateEdit() {
     const i = document.getElementById('receivedDate'), d = document.getElementById('receivedDateDisplay');
@@ -609,10 +634,23 @@ function toggleDateEdit() {
     else { i.classList.add('hidden'); d.classList.remove('hidden'); const iso = i.value||todayISO(); d.textContent = iso===todayISO() ? `Today (${formatDateUK(iso)})` : formatDateUK(iso); }
 }
 
-function updateSerialDisplay() { const el = document.getElementById('serialDigits'); if (!serialDigitsValue.length) { el.textContent='_____'; el.classList.add('empty'); } else { el.textContent = serialDigitsValue + '_'.repeat(5-serialDigitsValue.length); el.classList.remove('empty'); } }
-function numpad(d) { if (serialDigitsValue.length < 5) { serialDigitsValue += d; updateSerialDisplay(); } }
-function numpadBack() { serialDigitsValue = serialDigitsValue.slice(0,-1); updateSerialDisplay(); }
-function numpadClear() { serialDigitsValue = ''; updateSerialDisplay(); }
+function updateSerialDisplay() {
+    const el = document.getElementById('serialDigits');
+    // If NO S/N was set, clear that state whenever we update the display from digits
+    if (!noSerialNumber) { el.style.color = ''; }
+    if (!serialDigitsValue.length) { el.textContent='_____'; el.classList.add('empty'); }
+    else { el.textContent = serialDigitsValue + '_'.repeat(5-serialDigitsValue.length); el.classList.remove('empty'); }
+}
+function clearNoSNState() {
+    // Called whenever user interacts with the digit pad — cancels the NO S/N override
+    if (noSerialNumber) {
+        noSerialNumber = false;
+        document.getElementById('serialDigits').style.color = '';
+    }
+}
+function numpad(d) { clearNoSNState(); if (serialDigitsValue.length < 5) { serialDigitsValue += d; updateSerialDisplay(); } }
+function numpadBack() { clearNoSNState(); serialDigitsValue = serialDigitsValue.slice(0,-1); updateSerialDisplay(); }
+function numpadClear() { clearNoSNState(); serialDigitsValue = ''; updateSerialDisplay(); }
 
 function toggleCheckbox(id) { const cb = document.getElementById(id); cb.checked = !cb.checked; cb.closest('.checkbox-item').classList.toggle('checked', cb.checked); }
 function selectPF(el) { document.querySelectorAll(`[data-pf="${el.dataset.pf}"]`).forEach(n => n.classList.remove('checked')); el.classList.add('checked'); }
@@ -734,8 +772,33 @@ function previousPage() { if (currentPage>1) showPage(currentPage-1); }
 
 // ============ CSV / DATE PARSING ============
 function parseCSV(text) { const rows=[]; let row=[],field='',q=false; for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1]; if(c==='"'){if(q&&n==='"'){field+='"';i++;}else q=!q;} else if(c===','&&!q){row.push(field);field='';} else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&n==='\n')i++;if(field||row.length){row.push(field);rows.push(row);row=[];field='';}} else field+=c;} if(field||row.length){row.push(field);rows.push(row);} return rows; }
-function parseExpectedDate(s) { if(!s) return null; const m=s.match(/EXP\s*(\d{1,2})\/(\d{1,2})/i); return m ? new Date(new Date().getFullYear(),parseInt(m[2])-1,parseInt(m[1])) : null; }
-function parseDateFromSheet(s) { if(!s) return null; const d=new Date(s); if(!isNaN(d.getTime())) return d; const p=s.split('/'); if(p.length===3){const dd=parseInt(p[0]),mm=parseInt(p[1])-1,yy=parseInt(p[2]);if(!isNaN(dd+mm+yy)) return new Date(yy,mm,dd);} return null; }
+function parseExpectedDate(s) {
+    if (!s) return null;
+    const m = s.match(/EXP\s*(\d{1,2})\/(\d{1,2})/i);
+    if (!m) return null;
+    const now = new Date();
+    const year = now.getFullYear();
+    const d = new Date(year, parseInt(m[2])-1, parseInt(m[1]));
+    // If the parsed date is more than 2 months in the past, assume it's next year's booking
+    const twoMonthsAgo = new Date(now); twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+    if (d < twoMonthsAgo) d.setFullYear(year + 1);
+    return d;
+}
+function parseDateFromSheet(s) {
+    if (!s) return null;
+    // Prefer explicit UK DD/MM/YYYY — don't trust new Date(str), it's locale-dependent
+    const p = s.split('/');
+    if (p.length === 3) {
+        const dd = parseInt(p[0]), mm = parseInt(p[1])-1, yy = parseInt(p[2]);
+        if (!isNaN(dd+mm+yy)) return new Date(yy, mm, dd);
+    }
+    // Fall back to ISO format only (YYYY-MM-DD) — unambiguous
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) return d;
+    }
+    return null;
+}
 function getDateCategory(d) { if(!d) return 'future'; const t=new Date();t.setHours(0,0,0,0); const tom=new Date(t);tom.setDate(tom.getDate()+1); const wk=new Date(t);wk.setDate(wk.getDate()+7); const ed=new Date(d);ed.setHours(0,0,0,0); if(ed.getTime()===t.getTime()) return 'today'; if(ed.getTime()===tom.getTime()) return 'tomorrow'; if(ed<=wk) return 'soon'; return 'future'; }
 
 let cachedRows = [];
@@ -745,7 +808,8 @@ async function loadJobs() {
         const gid = getCurrentMonthGid(), month = getCurrentMonthName();
         if (gid===null) { document.getElementById('loadingJobs').innerHTML=`<div class="error-message">No GID for ${month}.</div>`; return; }
         const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`);
-        const text = await res.text(); const allRows = parseCSV(text); cachedRows = allRows; const rows = allRows.slice(1);
+        const text = (await res.text()).replace(/^\uFEFF/, ''); // strip BOM if present
+        const allRows = parseCSV(text); cachedRows = allRows; const rows = allRows.slice(1);
         document.getElementById('loadingJobs').classList.add('hidden');
         document.getElementById('currentMonthDisplay').textContent = `Viewing: ${month} ${new Date().getFullYear()}`;
         const today = new Date(); today.setHours(0,0,0,0);
@@ -771,7 +835,7 @@ async function loadJobs() {
         document.getElementById('statToday').textContent=due;
         document.getElementById('statCurrent').textContent=currentJobs.length;
         document.getElementById('statCompleted').textContent=completedJobs.length;
-        showTodayJobs();
+        showJobTab('current');
         generateNextJobNumber();
         updateCategoryCounts();
     } catch(err) { console.error(err); document.getElementById('loadingJobs').innerHTML='<div class="error-message">Error loading jobs. Refresh the page.</div>'; }
@@ -840,14 +904,28 @@ function displayCompletedJobs(jobs) {
     });
 }
 function filterJobs() {
-    const df=document.getElementById('dateFilter').value,st=document.getElementById('searchJob').value.toUpperCase().trim();
-    let list=activeTab==='current'?currentJobs:activeTab==='expected'?expectedJobs:completedJobs;
-    if(st) list=list.filter(j=>j.jobNumber.toUpperCase().includes(st));
-    if(df&&activeTab==='current') list=list.filter(j=>{const pd=parseDateFromSheet(j.packReceived);return pd&&pd.toDateString()===new Date(df).toDateString();});
-    if(activeTab==='current') displayJobs(list); else if(activeTab==='expected') displayExpectedJobs(list); else displayCompletedJobs(list);
+    const df = document.getElementById('dateFilter').value;
+    const st = document.getElementById('searchJob').value.toUpperCase().trim();
+    let list = activeTab==='current' ? currentJobs : activeTab==='expected' ? expectedJobs : completedJobs;
+    if (st) list = list.filter(j => j.jobNumber.toUpperCase().includes(st));
+    if (df) {
+        const filterDate = new Date(df);
+        list = list.filter(j => {
+            // Use the already-parsed date stored on the job object (handles both EXP and regular dates)
+            const pd = j.receivedDate || j.expectedDate || parseDateFromSheet(j.packReceived);
+            return pd && pd.toDateString() === filterDate.toDateString();
+        });
+    }
+    if (activeTab==='current') displayJobs(list);
+    else if (activeTab==='expected') displayExpectedJobs(list);
+    else displayCompletedJobs(list);
 }
 function showAllJobs() { document.getElementById('dateFilter').value=''; document.getElementById('searchJob').value=''; showJobTab(activeTab); }
-function showTodayJobs() { showJobTab('current'); }
+function showTodayJobs() {
+    showJobTab('current');
+    document.getElementById('dateFilter').value = todayISO();
+    filterJobs();
+}
 
 // ============ REPAIR FORM ============
 function selectJob(job) {
@@ -908,7 +986,7 @@ function submitForm() {
     const data=collectFormData(); const btn=document.querySelector('.btn-submit'); const orig=btn.textContent;
     btn.textContent='Saving...'; btn.disabled=true;
     saveDateCodeSuggestion(dateCodeValue.toUpperCase());
-    fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(data)})
+    fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(data)})
     .then(()=>{document.getElementById('successMessage').classList.remove('hidden');deleteDraft(data.jobNumber);window.scrollTo(0,0);alert('Repair record saved!');btn.textContent=orig;btn.disabled=false;setTimeout(()=>{backToJobSelector();loadJobs();},1500);})
     .catch(err=>{document.getElementById('errorMessage').textContent='Error: '+err.message;document.getElementById('errorMessage').classList.remove('hidden');btn.textContent=orig;btn.disabled=false;window.scrollTo(0,0);});
 }
@@ -920,10 +998,21 @@ function saveDraft() {
     alert('✅ Draft saved!'); backToJobSelector();
 }
 function loadDraft(jn) {
-    const raw=localStorage.getItem(`draft_${jn}`); if(!raw) return false;
-    const d=JSON.parse(raw);
-    if(!confirm(`📋 Draft from ${new Date(d.timestamp).toLocaleString()}\n\nResume?`)) return false;
-    restoreFormData(d.formData,d.serialDigitsValue||''); showPage(d.currentPage); return true;
+    const raw = localStorage.getItem(`draft_${jn}`);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    const resumeIt = confirm(
+        `📋 Unsaved draft found from ${new Date(d.timestamp).toLocaleString()}\n\n` +
+        `OK — Resume the draft\n` +
+        `Cancel — Discard it and start fresh`
+    );
+    if (!resumeIt) {
+        deleteDraft(jn);
+        return false;
+    }
+    restoreFormData(d.formData, d.serialDigitsValue || '');
+    showPage(d.currentPage);
+    return true;
 }
 function deleteDraft(jn) { localStorage.removeItem(`draft_${jn}`); }
 function restoreFormData(d,serial) {
@@ -942,6 +1031,39 @@ function restoreFormData(d,serial) {
     if(d.returnTracking) { trackingValue=d.returnTracking; updateTrackingDisplay(); }
     toggleInvoiceField();
     if(d.parts){const map={circuitBoard:'partCircuitBoard',frontCase:'partFrontCase',rearCase:'partRearCase',negSocket:'partNegSocket',posSocket:'partPosSocket',cigLighter:'partCigLighter',dcSocket:'partDCSocket',testButton:'partTestButton',m2m:'partM2M',newPack:'partNewPack'};Object.entries(d.parts).forEach(([k,v])=>{const id=map[k];if(!id)return;const cb=document.getElementById(id);cb.checked=!!v;cb.closest('.checkbox-item').classList.toggle('checked',!!v);});}
+}
+
+// ============ BOOKING STATE PERSISTENCE ============
+// Keeps lastBookingData / lastUPSResult available across page reloads so the
+// "Send Label" button still works if the page refreshes unexpectedly.
+function saveBookingState() {
+    try {
+        if (lastBookingData && lastUPSResult) {
+            sessionStorage.setItem(BOOKING_STATE_KEY, JSON.stringify({
+                bookingData: lastBookingData,
+                upsResult: lastUPSResult,
+                savedAt: new Date().toISOString()
+            }));
+        }
+    } catch (e) { console.warn('Could not persist booking state:', e); }
+}
+function loadBookingState() {
+    try {
+        const raw = sessionStorage.getItem(BOOKING_STATE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        // Discard state older than 12 hours — avoids stale data hanging around
+        if (parsed.savedAt) {
+            const age = Date.now() - new Date(parsed.savedAt).getTime();
+            if (age > 12 * 60 * 60 * 1000) { clearBookingState(); return; }
+        }
+        lastBookingData = parsed.bookingData;
+        lastUPSResult = parsed.upsResult;
+    } catch (e) { console.warn('Could not restore booking state:', e); }
+}
+function clearBookingState() {
+    lastBookingData = null; lastUPSResult = null;
+    try { sessionStorage.removeItem(BOOKING_STATE_KEY); } catch (e) {}
 }
 
 // ============ BOOKING PORTAL ============
@@ -964,17 +1086,20 @@ function openBookingPortal() {
     document.getElementById('boxConfigSection').classList.add('hidden');
     document.getElementById('bookingSubmitBtn').textContent='Book Repair, Generate Label & Schedule Pickup';
     document.getElementById('bookingSubmitBtn').disabled=false;
-    lastBookingData=null; lastUPSResult=null;
+    clearBookingState();
     window.scrollTo(0,0);
 }
-function closeBookingPortal() { document.getElementById('bookingPortal').classList.add('hidden'); document.getElementById('jobSelector').classList.remove('hidden'); }
+function closeBookingPortal() {
+    document.getElementById('bookingPortal').classList.add('hidden');
+    document.getElementById('jobSelector').classList.remove('hidden');
+    clearBookingState();
+}
 
 function selectPackCount(el) {
     el.closest('.pack-count-row').querySelectorAll('.pack-count-btn').forEach(b=>b.classList.remove('selected'));
     el.classList.add('selected');
     bookingPackCount=parseInt(el.dataset.packs);
-    document.getElementById('packWeightDisplay').textContent=`Total weight: ${bookingPackCount*10} kg`;
-    
+
     const boxSection = document.getElementById('boxConfigSection');
     if (bookingPackCount > 1) {
         boxSection.classList.remove('hidden');
@@ -985,6 +1110,7 @@ function selectPackCount(el) {
         boxSection.classList.add('hidden');
         boxConfig = [10];
     }
+    refreshPackWeightDisplay();
 }
 
 function renderBoxConfig() {
@@ -1009,16 +1135,42 @@ function renderBoxConfig() {
     const addBtn = document.createElement('button');
     addBtn.textContent = '+ Add Another Box';
     addBtn.style.cssText = 'width:100%;padding:12px;background:#e9ecef;border:2px dashed #adb5bd;border-radius:8px;font-weight:600;cursor:pointer;color:#666;margin-top:4px;';
-    addBtn.onclick = () => { boxConfig.push(10); renderBoxConfig(); };
+    addBtn.onclick = () => { boxConfig.push(10); renderBoxConfig(); refreshPackWeightDisplay(); };
     container.appendChild(addBtn);
 }
-function updateBoxWeight(idx, val) { boxConfig[idx] = parseInt(val); }
-function removeBox(idx) { boxConfig.splice(idx, 1); renderBoxConfig(); }
+function updateBoxWeight(idx, val) { boxConfig[idx] = parseInt(val); refreshPackWeightDisplay(); }
+function removeBox(idx) { boxConfig.splice(idx, 1); renderBoxConfig(); refreshPackWeightDisplay(); }
+function refreshPackWeightDisplay() {
+    const display = document.getElementById('packWeightDisplay');
+    if (!display) return;
+    if (bookingPackCount <= 1) {
+        display.textContent = `Total weight: ${bookingPackCount * 10} kg`;
+        display.style.color = '#666';
+        return;
+    }
+    const boxTotal = boxConfig.reduce((a, b) => a + b, 0);
+    const expected = bookingPackCount * 10;
+    if (boxTotal === expected) {
+        display.textContent = `Total weight: ${boxTotal} kg across ${boxConfig.length} box${boxConfig.length>1?'es':''} ✓`;
+        display.style.color = '#155724';
+    } else {
+        display.textContent = `⚠ Box weights total ${boxTotal} kg but ${bookingPackCount} packs = ${expected} kg`;
+        display.style.color = '#c41e3a';
+    }
+}
 
 function appendEmailSuffix(suffix) {
-    const input=document.getElementById('bkEmail'); const val=input.value.trim();
-    const at=val.indexOf('@');
-    input.value = at>=0 ? val.substring(0,at)+suffix : val+suffix;
+    const input = document.getElementById('bkEmail');
+    const val = input.value.trim();
+    const at = val.indexOf('@');
+    if (at >= 0) {
+        const existingDomain = val.substring(at);
+        if (existingDomain.toLowerCase() === suffix.toLowerCase()) { input.focus(); return; }
+        if (!confirm(`Replace "${existingDomain}" with "${suffix}"?`)) { input.focus(); return; }
+        input.value = val.substring(0, at) + suffix;
+    } else {
+        input.value = val + suffix;
+    }
     input.focus();
 }
 
@@ -1051,12 +1203,34 @@ function selectAddress() { const opt=document.getElementById('addressSelect').op
 
 // ============ BOOKING + UPS (combined) ============
 function validateBooking() {
-    return document.getElementById('bkCustomerName').value.trim() && document.getElementById('bkAddress').value.trim() && document.getElementById('bkCity').value.trim() && document.getElementById('bkPostcodeFinal').value.trim() && document.getElementById('bkPhone').value.trim() && document.getElementById('bkEmail').value.trim() && document.getElementById('bkPickupDate').value;
+    const email = document.getElementById('bkEmail').value.trim();
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    return document.getElementById('bkCustomerName').value.trim()
+        && document.getElementById('bkAddress').value.trim()
+        && document.getElementById('bkCity').value.trim()
+        && document.getElementById('bkPostcodeFinal').value.trim()
+        && document.getElementById('bkPhone').value.trim()
+        && emailValid
+        && document.getElementById('bkPickupDate').value;
 }
 
 async function submitBookingAndUPS() {
     if(!validateBooking()){document.getElementById('bookingValidation').classList.add('show');return;}
     document.getElementById('bookingValidation').classList.remove('show');
+
+    // Validate box weights for multi-pack bookings
+    if (bookingPackCount > 1) {
+        const boxTotal = boxConfig.reduce((a, b) => a + b, 0);
+        const expected = bookingPackCount * 10;
+        if (boxTotal !== expected) {
+            document.getElementById('bookingError').textContent =
+                `Box weights total ${boxTotal} kg, but ${bookingPackCount} packs should weigh ${expected} kg. Please adjust the box configuration.`;
+            document.getElementById('bookingError').classList.remove('hidden');
+            window.scrollTo(0, 0);
+            return;
+        }
+    }
+    document.getElementById('bookingError').classList.add('hidden');
 
     const btn=document.getElementById('bookingSubmitBtn');
     btn.textContent='Saving booking...'; btn.disabled=true;
@@ -1084,7 +1258,7 @@ async function submitBookingAndUPS() {
     try {
         // Step 1: Save booking to sheet
         btn.textContent='Saving booking...';
-        const bookRes=await fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(bookingData)});
+        const bookRes=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(bookingData)});
         const bookResult=await bookRes.json();
         if(!bookResult.success) throw new Error(bookResult.error||'Booking save failed');
 
@@ -1098,7 +1272,7 @@ async function submitBookingAndUPS() {
                 customerName, customerAddress, customerCity, customerPostcode, customerPhone, customerEmail,
                 weight: boxes[b], packCount: bookingPackCount
             };
-            const labelRes=await fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(labelData)});
+            const labelRes=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(labelData)}, 60000);
             const labelResult=await labelRes.json();
             if(!labelResult.success) throw new Error(labelResult.error||'Label generation failed for box '+(b+1));
             labelResults.push(labelResult);
@@ -1111,7 +1285,7 @@ async function submitBookingAndUPS() {
             customerName, customerAddress, customerCity, customerPostcode, customerPhone,
             packCount:bookingPackCount, pickupDate:formatDateUK(pickupISO), pickupDateISO:pickupISO
         };
-        const pickupRes=await fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(pickupData)});
+        const pickupRes=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(pickupData)}, 60000);
         const pickupResult=await pickupRes.json();
         if(!pickupResult.success) throw new Error(pickupResult.error||'Pickup scheduling failed');
 
@@ -1123,6 +1297,8 @@ async function submitBookingAndUPS() {
             labelCount: labelResults.length,
             allTrackingNumbers: labelResults.map(r => r.trackingNumber)
         };
+        // Persist so a page reload doesn't break the Send Label button
+        saveBookingState();
 
         // Show success
         const packText = bookingPackCount > 1 ? `(${bookingPackCount} packs: ${nextJobNumber} #1 to #${bookingPackCount})` : '';
@@ -1156,12 +1332,12 @@ async function sendLabelEmail() {
     btn.textContent = 'Sending label...'; btn.disabled = true;
     
     try {
-        const res=await fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+        const res=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
             action:'sendEmail', jobNumber:lastBookingData.jobNumber,
             customerName:lastBookingData.customerName, customerEmail:lastBookingData.customerEmail,
             pickupDate:lastBookingData.pickupDate, pickupConfirmation:lastUPSResult.pickupConfirmation,
             trackingNumber:lastUPSResult.trackingNumber
-        })});
+        })}, 60000);
         const result=await res.json();
         if(result.success) {
             alert(`✅ Label sent to ${lastBookingData.customerEmail}`);
@@ -1192,13 +1368,13 @@ async function sendEditedEmail() {
     const sendBtn = document.querySelector('.modal .btn-submit');
     sendBtn.textContent = 'Sending...'; sendBtn.disabled = true;
     try {
-        const res=await fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+        const res=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
             action:'resendEmail', jobNumber:lastBookingData.jobNumber,
             customerName:lastBookingData.customerName, customerEmail:lastBookingData.customerEmail,
             emailSubject:document.getElementById('modalSubject').value,
             customEmailBody:document.getElementById('modalBody').value,
             trackingNumber:lastUPSResult.trackingNumber
-        })});
+        })}, 60000);
         const result=await res.json();
         if(result.success){
             closeEmailModal();
@@ -1239,7 +1415,7 @@ async function lookupJobForRebook() {
     document.getElementById('rebookError').classList.add('hidden');
     
     try {
-        const res = await fetch(SERVICE_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ action:'lookupJob', jobNumber: jn })});
+        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ action:'lookupJob', jobNumber: jn })});
         const result = await res.json();
         
         if (result.success && result.found) {
@@ -1273,11 +1449,11 @@ async function submitRebook() {
     const btn=document.getElementById('rebookSubmitBtn');
     btn.textContent='Rebooking collection...'; btn.disabled=true;
     try {
-        const res=await fetch(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+        const res=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
             action:'rebookPickup', jobNumber:jn,
             customerName:name, customerAddress:addr, customerCity:city||addr.split(',').pop().trim(), customerPostcode:pc.toUpperCase(), customerPhone:phone,
             packCount:rebookPackCount, pickupDateISO:pickup
-        })});
+        })}, 60000);
         const result=await res.json();
         if(result.success){
             alert(`✅ Collection rebooked!\n\nJob: ${jn}\nNew pickup ref: ${result.pickupConfirmation}`);
@@ -1290,7 +1466,16 @@ async function submitRebook() {
     btn.textContent='Rebook Pickup'; btn.disabled=false;
 }
 
+// Allow Escape key to close the email modal
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('emailModal');
+        if (modal && !modal.classList.contains('hidden')) closeEmailModal();
+    }
+});
+
 // ============ INIT ============
+loadBookingState();
 loadJobs();
 updateProgress();
 updateSerialDisplay();
