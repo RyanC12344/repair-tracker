@@ -582,7 +582,7 @@ textarea { resize: vertical; min-height: 80px; }
 // ============ CONFIG ============
 const SHEET_ID = '1iVCdZRmTXEfbV8_tmjomq7Cs8-za80yuW8z3QwpdXBk';
 const SERVICE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxZEMgdG1vfqT4L7HuGreb1_o8Ltrxmc5wIgYID4i_sghLa-Ey2TJhzi3Giz54qIlE10A/exec';
-const IDEAL_POSTCODES_KEY = 'ak_mo77tj481BVZPetZv3QJe4xUSsEip';
+// Note: Ideal Postcodes API key is stored in Apps Script Script Properties, not here.
 
 const MONTH_GIDS = { 1:null, 2:null, 3:null, 4:21700818, 5:257806692, 6:199519344, 7:0, 8:2124425478, 9:782015307, 10:1786550392, 11:330568521, 12:1114698946 };
 const MONTH_NAMES = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
@@ -1174,30 +1174,52 @@ function appendEmailSuffix(suffix) {
     input.focus();
 }
 
-// ============ POSTCODE LOOKUP ============
+// ============ POSTCODE LOOKUP (via Apps Script proxy) ============
 async function lookupPostcode() {
-    const postcode=document.getElementById('bkPostcode').value.trim();
-    if(!postcode){alert('Please enter a postcode.');return;}
-    if(!IDEAL_POSTCODES_KEY){document.getElementById('bkPostcodeFinal').value=postcode.toUpperCase();return;}
+    const postcode = document.getElementById('bkPostcode').value.trim();
+    if (!postcode) { alert('Please enter a postcode.'); return; }
+
     try {
-        const res=await fetch(`https://api.ideal-postcodes.co.uk/v1/postcodes/${encodeURIComponent(postcode)}?api_key=${IDEAL_POSTCODES_KEY}`);
-        const data=await res.json();
-        if(data.code===4040){alert('Postcode not found.');return;}
-        if(data.code!==2000||!data.result||!data.result.length){alert('No addresses found.');return;}
-        const select=document.getElementById('addressSelect');
-        select.innerHTML='<option value="">— Select an address —</option>';
-        data.result.forEach((addr,i)=>{
-            const streetParts=[addr.line_1,addr.line_2,addr.line_3].filter(p=>p&&p.trim());
-            const displayParts=[...streetParts,addr.post_town,addr.county].filter(p=>p&&p.trim());
-            const opt=document.createElement('option');opt.value=i;opt.textContent=displayParts.join(', ');
-            opt.dataset.street=streetParts.join(', ');
-            opt.dataset.city=addr.post_town||'';
-            opt.dataset.address=displayParts.join(', ');
+        const res = await fetch(SERVICE_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'lookupPostcode', postcode: postcode })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            alert('Address lookup error: ' + (data.error || 'unknown error') + '\n\nYou can enter the address manually.');
+            return;
+        }
+        if (!data.found) {
+            if (data.reason === 'postcode_not_found') alert('Postcode not found.');
+            else alert('No addresses found for that postcode.');
+            return;
+        }
+        if (!data.addresses || !data.addresses.length) {
+            alert('No addresses returned. Enter the address manually.');
+            return;
+        }
+
+        const select = document.getElementById('addressSelect');
+        select.innerHTML = '<option value="">— Select an address —</option>';
+        data.addresses.forEach((addr, i) => {
+            const streetParts = [addr.line_1, addr.line_2, addr.line_3].filter(p => p && p.trim());
+            const displayParts = [...streetParts, addr.post_town, addr.county].filter(p => p && p.trim());
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = displayParts.join(', ');
+            opt.dataset.street = streetParts.join(', ');
+            opt.dataset.city = addr.post_town || '';
+            opt.dataset.address = displayParts.join(', ');
             select.appendChild(opt);
         });
         document.getElementById('addressResults').classList.remove('hidden');
-        document.getElementById('bkPostcodeFinal').value=(data.result[0].postcode||postcode).toUpperCase();
-    } catch(err){console.error(err);alert('Address lookup error. Enter address manually.');}
+        document.getElementById('bkPostcodeFinal').value = (data.addresses[0].postcode || postcode).toUpperCase();
+    } catch (err) {
+        console.error(err);
+        alert('Address lookup error. Enter the address manually.');
+    }
 }
 function selectAddress() { const opt=document.getElementById('addressSelect').options[document.getElementById('addressSelect').selectedIndex]; if(opt&&opt.dataset.address) { document.getElementById('bkAddress').value=opt.dataset.street||opt.dataset.address; document.getElementById('bkCity').value=opt.dataset.city||''; } }
 
