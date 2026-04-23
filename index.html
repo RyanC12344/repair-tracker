@@ -1530,45 +1530,96 @@ async function submitBookingAndUPS() {
             labelResults.push(labelResult);
         }
 
-        // Step 3: Schedule pickup
+        // Step 3: Schedule pickup. If this fails we DON'T throw — labels and sheet row
+        // are already saved with real tracking numbers, so we treat it as a partial
+        // success: email can still go out, and you go to Rebook to schedule collection.
         setButtonLoading(btn, true, 'Scheduling pickup...');
         const pickupData = {
             action:'schedulePickup', jobNumber:nextJobNumber,
             customerName, customerAddress, customerCity, customerPostcode, customerPhone,
             packCount:bookingPackCount, pickupDate:formatDateUK(pickupISO), pickupDateISO:pickupISO
         };
-        const pickupRes=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(pickupData)}, 60000);
-        const pickupResult=await pickupRes.json();
-        if(!pickupResult.success) throw new Error(pickupResult.error||'Pickup scheduling failed');
+        let pickupResult = null;
+        let pickupError = null;
+        try {
+            const pickupRes = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify(pickupData)
+            }, 60000);
+            pickupResult = await pickupRes.json();
+            if (!pickupResult.success) {
+                pickupError = pickupResult.error || 'Pickup scheduling failed';
+                pickupResult = null;
+            }
+        } catch (err) {
+            pickupError = err.message;
+        }
 
-        // Store results for email sending
+        // Store results for email sending. When pickup failed, we still store booking+label
+        // info so the Send Label button works — just with no pickup reference.
         lastBookingData = { ...bookingData, customerCity, customerEmail };
         lastUPSResult = {
             trackingNumber: labelResults[0].trackingNumber,
-            pickupConfirmation: pickupResult.pickupConfirmation,
+            pickupConfirmation: pickupResult ? pickupResult.pickupConfirmation : null,
             labelCount: labelResults.length,
-            allTrackingNumbers: labelResults.map(r => r.trackingNumber)
+            allTrackingNumbers: labelResults.map(r => r.trackingNumber),
+            pickupFailed: !pickupResult
         };
         // Persist so a page reload doesn't break the Send Label button
         saveBookingState();
 
-        // Show success
         const packText = bookingPackCount > 1 ? `(${bookingPackCount} packs: ${nextJobNumber} #1 to #${bookingPackCount})` : '';
         const trackingList = labelResults.map((r, i) => `Box ${i+1}: <strong>${r.trackingNumber}</strong>`).join('<br>');
-        document.getElementById('upsSuccessMsg').innerHTML = `
-            ✓ Booking saved ${packText}<br>
-            ✓ ${labelResults.length} UPS Label${labelResults.length>1?'s':''} generated:<br>${trackingList}<br>
-            ✓ Pickup scheduled — Ref: <strong>${pickupResult.pickupConfirmation}</strong>
-        `;
-        document.getElementById('upsResults').classList.remove('hidden');
-        document.getElementById('bookingSuccess').classList.add('hidden');
-        setButtonLoading(btn, false);
-        btn.textContent = '✓ Complete';
-        btn.disabled = true;
-        showToast(`Booking ${nextJobNumber} complete — ${labelResults.length} label(s), pickup ${pickupResult.pickupConfirmation}`, 'success', 5000);
-        window.scrollTo(0, document.getElementById('upsResults').offsetTop - 100);
+
+        if (pickupResult) {
+            // Full success — same as before
+            document.getElementById('upsSuccessMsg').innerHTML = `
+                ✓ Booking saved ${packText}<br>
+                ✓ ${labelResults.length} UPS Label${labelResults.length>1?'s':''} generated:<br>${trackingList}<br>
+                ✓ Pickup scheduled — Ref: <strong>${pickupResult.pickupConfirmation}</strong>
+            `;
+            document.getElementById('upsResults').classList.remove('hidden');
+            document.getElementById('bookingSuccess').classList.add('hidden');
+            setButtonLoading(btn, false);
+            btn.textContent = '✓ Complete';
+            btn.disabled = true;
+            showToast(`Booking ${nextJobNumber} complete — ${labelResults.length} label(s), pickup ${pickupResult.pickupConfirmation}`, 'success', 5000);
+            window.scrollTo(0, document.getElementById('upsResults').offsetTop - 100);
+        } else {
+            // Partial success — labels saved, pickup failed. Show a prominent warning
+            // but still let the user send the email. They'll need to book the pickup
+            // separately on the Rebook page.
+            document.getElementById('upsSuccessMsg').innerHTML = `
+                <div style="background:#fff3cd;border:2px solid #ffc107;color:#856404;padding:14px;border-radius:8px;margin-bottom:12px;font-size:15px;line-height:1.5;">
+                    <strong>⚠ Pickup was NOT scheduled</strong><br>
+                    Labels were generated successfully, but UPS rejected the pickup request.<br>
+                    <strong>You must go to the Rebook Pickup page and schedule the collection for ${nextJobNumber} separately.</strong><br>
+                    <span style="font-size:13px;opacity:0.85;">Error: ${pickupError}</span>
+                </div>
+                ✓ Booking saved ${packText}<br>
+                ✓ ${labelResults.length} UPS Label${labelResults.length>1?'s':''} generated:<br>${trackingList}<br>
+                ✗ Pickup scheduling FAILED — use Rebook Pickup page
+            `;
+            document.getElementById('upsResults').classList.remove('hidden');
+            document.getElementById('bookingSuccess').classList.add('hidden');
+            setButtonLoading(btn, false);
+            btn.textContent = '⚠ Pickup needs rebooking';
+            btn.disabled = true;
+            showToast(`Booking ${nextJobNumber} saved — pickup FAILED, go to Rebook Pickup`, 'warning', 10000);
+            // Also show a proper modal dialog so the message isn't missed
+            confirmDialog({
+                title: '⚠ Pickup Scheduling Failed',
+                message: `Labels are ready and the booking is saved, but UPS rejected the pickup request.\n\nYou must schedule the collection separately using the "Rebook Pickup" page.\n\nJob: ${nextJobNumber}\nError: ${pickupError}`,
+                okText: 'OK, I\'ll rebook',
+                cancelText: 'Cancel'
+            });
+            window.scrollTo(0, document.getElementById('upsResults').offsetTop - 100);
+        }
 
     } catch(err) {
+        // Only Step 1 or Step 2 failures reach here (booking save or label gen).
+        // Pickup failures are handled above and do NOT throw.
         console.error(err);
         document.getElementById('bookingError').textContent='Error: '+err.message;
         document.getElementById('bookingError').classList.remove('hidden');
@@ -1601,9 +1652,25 @@ async function sendLabelEmail() {
         }, 60000);
         const result = await res.json();
         if (result.success) {
-            showToast(`Label sent to ${lastBookingData.customerEmail}`, 'success', 4000);
-            closeBookingPortal();
-            loadJobs();
+            const pickupFailed = lastUPSResult && lastUPSResult.pickupFailed;
+            const jobNum = lastBookingData.jobNumber;
+
+            if (pickupFailed) {
+                // Email's gone — now remind the user that pickup still needs rebooking
+                showToast(`Label sent to ${lastBookingData.customerEmail}`, 'success', 3000);
+                await confirmDialog({
+                    title: '⚠ Remember: pickup still needs rebooking',
+                    message: `Label sent to the customer successfully.\n\nThe UPS pickup for ${jobNum} was NOT scheduled — please go to the Rebook Pickup page to arrange collection.`,
+                    okText: 'OK, got it',
+                    cancelText: 'Dismiss'
+                });
+                closeBookingPortal();
+                loadJobs();
+            } else {
+                showToast(`Label sent to ${lastBookingData.customerEmail}`, 'success', 4000);
+                closeBookingPortal();
+                loadJobs();
+            }
         } else {
             throw new Error(result.error);
         }
@@ -1626,11 +1693,19 @@ function openResendModal() {
     const name = lastBookingData.customerName;
     const pickupDate = lastBookingData.pickupDate;
     const pickupRef = lastUPSResult.pickupConfirmation || '';
+    const pickupFailed = lastUPSResult.pickupFailed;
+
+    // When pickup has actually been booked: standard confirmation wording.
+    // When pickup failed (labels generated but no collection scheduled yet): softer
+    // wording that doesn't falsely claim a collection has been arranged.
+    const pickupLine = pickupRef
+        ? `Further to our telephone conversation today, a collection by UPS has been arranged for between 09.00am and 5pm on ${pickupDate}. Your pickup reference is ${pickupRef}.`
+        : `Further to our telephone conversation today, please find the shipping label attached. We will confirm the UPS collection date with you shortly.`;
 
     document.getElementById('emailModalTitle').textContent = 'Resend / Edit Email';
     document.getElementById('modalRecipient').value = lastBookingData.customerEmail || '';
     document.getElementById('modalSubject').value = `Portable Power - UPS Collection & Shipping Label - ${lastBookingData.jobNumber}`;
-    document.getElementById('modalBody').value = `Hi ${name}\n\nFurther to our telephone conversation today, a collection by UPS has been arranged for between 09.00am and 5pm on ${pickupDate}.${pickupRef ? ' Your pickup reference is ' + pickupRef + '.' : ''}\n\nPlease print the attached shipping label and stick it on the box containing your Power Pack.\n\nThe box needs to be large enough to accommodate your power pack, mains charger and both leads, along with sufficient packing material to ensure nothing gets damaged in transit.\n\nI'm afraid that neither UPS, nor Portable Power Ltd. will pay compensation for inadequately packed items.\n\nYour leads must not be connected to the Power Pack, as this creates a serious fire risk.\n\nWith best regards,\nPortable Power LTD`;
+    document.getElementById('modalBody').value = `Hi ${name}\n\n${pickupLine}\n\nPlease print the attached shipping label and stick it on the box containing your Power Pack.\n\nThe box needs to be large enough to accommodate your power pack, mains charger and both leads, along with sufficient packing material to ensure nothing gets damaged in transit.\n\nI'm afraid that neither UPS, nor Portable Power Ltd. will pay compensation for inadequately packed items.\n\nYour leads must not be connected to the Power Pack, as this creates a serious fire risk.\n\nWith best regards,\nPortable Power LTD`;
 
     modalContext = {
         mode: 'freshResend',
@@ -1743,12 +1818,22 @@ async function sendModalEmail() {
 
         // Capture mode before closeEmailModal() clears modalContext
         const mode = modalContext.mode;
+        const pickupFailed = mode === 'freshResend' && lastUPSResult && lastUPSResult.pickupFailed;
+        const jobNum = modalContext.jobNumber;
         closeEmailModal();
         showToast(`Label sent to ${recipient}`, 'success', 4000);
 
         // freshResend flow: close the booking portal and refresh the list.
         // archivedResend flow: nothing else to do — user stays on the main list.
         if (mode === 'freshResend') {
+            if (pickupFailed) {
+                await confirmDialog({
+                    title: '⚠ Remember: pickup still needs rebooking',
+                    message: `Label sent to the customer successfully.\n\nThe UPS pickup for ${jobNum} was NOT scheduled — please go to the Rebook Pickup page to arrange collection.`,
+                    okText: 'OK, got it',
+                    cancelText: 'Dismiss'
+                });
+            }
             closeBookingPortal();
             loadJobs();
         }
