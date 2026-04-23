@@ -636,12 +636,13 @@ textarea { resize: vertical; min-height: 80px; }
 <div id="emailModal" class="hidden">
     <div class="modal-overlay" onclick="closeEmailModal()">
         <div class="modal" onclick="event.stopPropagation()">
-            <h3>Edit Email Before Sending</h3>
+            <h3 id="emailModalTitle">Edit Email Before Sending</h3>
+            <div class="form-group"><label for="modalRecipient">To</label><input type="email" id="modalRecipient" placeholder="recipient@example.com"></div>
             <div class="form-group"><label for="modalSubject">Subject</label><input type="text" id="modalSubject"></div>
             <div class="form-group"><label for="modalBody">Email Body</label><textarea id="modalBody" style="min-height:250px;"></textarea></div>
             <div class="modal-btns">
                 <button class="btn btn-previous" onclick="closeEmailModal()" style="flex:1;">Cancel</button>
-                <button class="btn btn-submit" onclick="sendEditedEmail()" style="flex:1;">Send Email</button>
+                <button class="btn btn-submit" id="modalSendBtn" style="flex:1;">Send Email</button>
             </div>
         </div>
     </div>
@@ -1033,7 +1034,39 @@ async function loadJobs() {
         showJobTab('current');
         generateNextJobNumber();
         updateCategoryCounts();
+        refreshArchivedJobs(); // fire-and-forget; re-renders cards when it lands
     } catch(err) { console.error(err); document.getElementById('loadingJobs').innerHTML='<div class="error-message">Error loading jobs. Refresh the page.</div>'; }
+}
+
+// Set of job numbers (base, without "#N") that have archived labels available for resend.
+// Populated async after loadJobs() completes. Using a plain object as a Set.
+let archivedJobs = {};
+
+async function refreshArchivedJobs() {
+    try {
+        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'listArchived' })
+        }, 30000);
+        const data = await res.json();
+        if (data.success && data.jobs) {
+            archivedJobs = data.jobs;
+            // Re-render while preserving any active search/date filter the user has applied.
+            // filterJobs() re-runs the current filter against the stored lists and re-renders,
+            // which is what we want — it doesn't clear the input fields like showJobTab does.
+            filterJobs();
+        }
+    } catch (err) {
+        console.warn('Could not load archived jobs list:', err);
+        // Silent failure — Resend buttons just won't appear. Not critical.
+    }
+}
+
+function jobHasArchivedLabel(jobNumber) {
+    if (!jobNumber) return false;
+    const baseJob = String(jobNumber).split('#')[0].trim();
+    return !!(archivedJobs[jobNumber] || archivedJobs[baseJob]);
 }
 
 function generateNextJobNumber() {
@@ -1063,17 +1096,41 @@ function showJobTab(tab) {
     document.getElementById('dateFilter').value=''; document.getElementById('searchJob').value='';
     if(tab==='current') displayJobs(currentJobs); else if(tab==='expected') displayExpectedJobs(expectedJobs); else displayCompletedJobs(completedJobs);
 }
+// Build a small "Resend Label" button for a job card. Returns the button element,
+// or null if the job has no archived label available. The button stops click
+// propagation so it doesn't trigger the parent card's onclick (which opens the repair form).
+function buildResendButton(job) {
+    if (!jobHasArchivedLabel(job.jobNumber)) return null;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '📧 Resend Label';
+    btn.style.cssText = 'margin-top:10px;padding:8px 14px;background:#667eea;color:white;border:none;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer;width:100%;';
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        resendLabelForJob(job);
+    });
+    return btn;
+}
+
 function displayJobs(jobs) {
-    const list=document.getElementById('jobList'),count=document.getElementById('jobCount');
-    list.innerHTML=''; if(!jobs.length){list.innerHTML='<p style="text-align:center;color:#666;">No jobs found.</p>';count.textContent='';return;}
-    count.textContent=`Showing ${jobs.length} job${jobs.length!==1?'s':''}`;
-    const today=new Date();today.setHours(0,0,0,0);
-    jobs.forEach(job=>{
-        let cls='',label='';
-        if(job.receivedDate){const rd=new Date(job.receivedDate);rd.setHours(0,0,0,0);if(rd.getTime()===today.getTime()){cls='repair-today';label='📦 DUE TODAY';}}
-        const card=document.createElement('div');card.className='job-card '+cls;
-        card.innerHTML=`<div class="job-card-number">${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress?' — '+job.customerAddress:''}</div><div style="font-size:14px;color:#999;margin-top:5px;">${job.packReceived?'Due: '+job.packReceived:''}</div>${label?`<div style="font-weight:700;margin-top:8px;color:#155724;background:#d4edda;padding:8px;border-radius:6px;text-align:center;">${label}</div>`:''}`;
-        card.onclick=()=>selectJob(job);list.appendChild(card);
+    const list = document.getElementById('jobList'), count = document.getElementById('jobCount');
+    list.innerHTML = '';
+    if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No jobs found.</p>'; count.textContent = ''; return; }
+    count.textContent = `Showing ${jobs.length} job${jobs.length !== 1 ? 's' : ''}`;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    jobs.forEach(job => {
+        let cls = '', label = '';
+        if (job.receivedDate) {
+            const rd = new Date(job.receivedDate); rd.setHours(0, 0, 0, 0);
+            if (rd.getTime() === today.getTime()) { cls = 'repair-today'; label = '📦 DUE TODAY'; }
+        }
+        const card = document.createElement('div');
+        card.className = 'job-card ' + cls;
+        card.innerHTML = `<div class="job-card-number">${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div><div style="font-size:14px;color:#999;margin-top:5px;">${job.packReceived ? 'Due: ' + job.packReceived : ''}</div>${label ? `<div style="font-weight:700;margin-top:8px;color:#155724;background:#d4edda;padding:8px;border-radius:6px;text-align:center;">${label}</div>` : ''}`;
+        card.onclick = () => selectJob(job);
+        const resendBtn = buildResendButton(job);
+        if (resendBtn) card.appendChild(resendBtn);
+        list.appendChild(card);
     });
 }
 function displayExpectedJobs(jobs) {
@@ -1085,18 +1142,58 @@ function displayExpectedJobs(jobs) {
         if(cat==='today'){cls='expected-today';label='📦 Arriving TODAY';}else if(cat==='tomorrow'){cls='expected-tomorrow';label='📅 Arriving TOMORROW';}else if(cat==='soon'){cls='expected-soon';label='🔜 Arriving This Week';}
         const card=document.createElement('div');card.className='job-card '+cls;card.style.cursor='default';
         card.innerHTML=`<div class="job-card-number">${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress?' — '+job.customerAddress:''}</div><div style="font-size:14px;color:#666;margin-top:5px;">Expected: ${job.packReceived}</div>${label?`<div style="font-weight:600;margin-top:8px;color:#333;">${label}</div>`:''}`;
+        const resendBtn = buildResendButton(job);
+        if (resendBtn) card.appendChild(resendBtn);
         list.appendChild(card);
     });
 }
 function displayCompletedJobs(jobs) {
-    const list=document.getElementById('jobList'),count=document.getElementById('jobCount');
-    list.innerHTML=''; if(!jobs.length){list.innerHTML='<p style="text-align:center;color:#666;">No completed repairs.</p>';count.textContent='';return;}
-    count.textContent=`Showing ${jobs.length} completed repair${jobs.length!==1?'s':''}`;
-    jobs.forEach(job=>{
-        const card=document.createElement('div');card.className='job-card repair-completed';
-        card.innerHTML=`<div class="job-card-number">✓ ${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress?' — '+job.customerAddress:''}</div><div style="font-size:14px;color:#999;margin-top:5px;">Serial: ${job.serialNumber}</div><div style="font-size:14px;color:#28a745;margin-top:5px;font-weight:600;">COMPLETED</div>`;
-        card.onclick=()=>selectJob(job);list.appendChild(card);
+    const list = document.getElementById('jobList'), count = document.getElementById('jobCount');
+    list.innerHTML = '';
+    if (!jobs.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No completed repairs.</p>'; count.textContent = ''; return; }
+    count.textContent = `Showing ${jobs.length} completed repair${jobs.length !== 1 ? 's' : ''}`;
+    jobs.forEach(job => {
+        const card = document.createElement('div');
+        card.className = 'job-card repair-completed';
+        card.innerHTML = `<div class="job-card-number">✓ ${job.jobNumber}</div><div class="job-card-customer">${job.customerName}${job.customerAddress ? ' — ' + job.customerAddress : ''}</div><div style="font-size:14px;color:#999;margin-top:5px;">Serial: ${job.serialNumber}</div><div style="font-size:14px;color:#28a745;margin-top:5px;font-weight:600;">COMPLETED</div>`;
+        card.onclick = () => selectJob(job);
+        const resendBtn = buildResendButton(job);
+        if (resendBtn) card.appendChild(resendBtn);
+        list.appendChild(card);
     });
+}
+
+// ============ RESEND ARCHIVED LABEL ============
+async function resendLabelForJob(job) {
+    // Look up the customer email and the pickup date from cached sheet data
+    // Columns: A=Job, E=Pack Received (often "EXP DD/MM" = the pickup date), J=Email
+    let email = '';
+    let pickupDate = '';
+    if (Array.isArray(cachedRows)) {
+        for (const row of cachedRows) {
+            const sheetJob = String(row[0] || '').trim();
+            const baseJob = sheetJob.split('#')[0].trim();
+            if (sheetJob === job.jobNumber || baseJob === job.jobNumber) {
+                email = String(row[9] || '').trim();
+                // Try to derive a human-readable pickup date from the Pack Received column
+                const packRec = String(row[4] || '').trim();
+                const expMatch = packRec.match(/EXP\s*(\d{1,2})\/(\d{1,2})/i);
+                if (expMatch) {
+                    // The customer ships to us on day X; the pickup was day X-1
+                    const year = new Date().getFullYear();
+                    const shipDay = new Date(year, parseInt(expMatch[2]) - 1, parseInt(expMatch[1]));
+                    shipDay.setDate(shipDay.getDate() - 1); // pickup was day before expected arrival
+                    pickupDate = formatDateUK(shipDay.toISOString().split('T')[0]);
+                } else if (packRec && !packRec.toUpperCase().startsWith('EXP')) {
+                    // If it's a real date (pack has already arrived), we don't know pickup date reliably
+                    pickupDate = '';
+                }
+                break;
+            }
+        }
+    }
+
+    openArchivedResendModal(job, email, pickupDate);
 }
 function filterJobs() {
     const df = document.getElementById('dateFilter').value;
@@ -1590,41 +1687,145 @@ async function sendLabelEmail() {
 }
 
 // ============ RESEND / EDIT EMAIL MODAL ============
+// The modal serves two flows:
+//   1. Post-booking "Resend / Edit" — triggered from the booking success screen
+//   2. Archived-label resend — triggered from the job card in the main list
+// We store the current mode + context in modalContext so sendModalEmail knows
+// what to POST when the user hits Send.
+let modalContext = null; // { mode: 'freshResend' | 'archivedResend', jobNumber, customerName, ... }
+
 function openResendModal() {
     if (!lastBookingData || !lastUPSResult) { showToast('No booking data available.', 'error'); return; }
-    const name=lastBookingData.customerName;
-    const pickupDate=lastBookingData.pickupDate;
-    const pickupRef=lastUPSResult.pickupConfirmation||'';
+    const name = lastBookingData.customerName;
+    const pickupDate = lastBookingData.pickupDate;
+    const pickupRef = lastUPSResult.pickupConfirmation || '';
 
-    document.getElementById('modalSubject').value=`Portable Power - UPS Collection & Shipping Label - ${lastBookingData.jobNumber}`;
-    document.getElementById('modalBody').value=`Hi ${name}\n\nFurther to our telephone conversation today, a collection by UPS has been arranged for between 09.00am and 5pm on ${pickupDate}.${pickupRef?' Your pickup reference is '+pickupRef+'.':''}\n\nPlease print the attached shipping label and stick it on the box containing your Power Pack.\n\nThe box needs to be large enough to accommodate your power pack, mains charger and both leads, along with sufficient packing material to ensure nothing gets damaged in transit.\n\nI'm afraid that neither UPS, nor Portable Power Ltd. will pay compensation for inadequately packed items.\n\nYour leads must not be connected to the Power Pack, as this creates a serious fire risk.\n\nWith best regards,\nPortable Power LTD`;
+    document.getElementById('emailModalTitle').textContent = 'Resend / Edit Email';
+    document.getElementById('modalRecipient').value = lastBookingData.customerEmail || '';
+    document.getElementById('modalSubject').value = `Portable Power - UPS Collection & Shipping Label - ${lastBookingData.jobNumber}`;
+    document.getElementById('modalBody').value = `Hi ${name}\n\nFurther to our telephone conversation today, a collection by UPS has been arranged for between 09.00am and 5pm on ${pickupDate}.${pickupRef ? ' Your pickup reference is ' + pickupRef + '.' : ''}\n\nPlease print the attached shipping label and stick it on the box containing your Power Pack.\n\nThe box needs to be large enough to accommodate your power pack, mains charger and both leads, along with sufficient packing material to ensure nothing gets damaged in transit.\n\nI'm afraid that neither UPS, nor Portable Power Ltd. will pay compensation for inadequately packed items.\n\nYour leads must not be connected to the Power Pack, as this creates a serious fire risk.\n\nWith best regards,\nPortable Power LTD`;
+
+    modalContext = {
+        mode: 'freshResend',
+        jobNumber: lastBookingData.jobNumber,
+        customerName: lastBookingData.customerName,
+        trackingNumber: lastUPSResult.trackingNumber
+    };
+
+    // Rewire the Send button to our unified handler
+    const btn = document.getElementById('modalSendBtn');
+    btn.onclick = sendModalEmail;
 
     document.getElementById('emailModal').classList.remove('hidden');
 }
-function closeEmailModal() { document.getElementById('emailModal').classList.add('hidden'); }
-async function sendEditedEmail() {
-    const sendBtn = document.querySelector('.modal .btn-submit');
+
+// Called from the Resend button on each job card in the main list.
+// Opens the email modal pre-populated so the user can edit recipient, subject, and body
+// before sending the archived label.
+function openArchivedResendModal(job, customerEmail, pickupDate) {
+    const name = job.customerName || 'Customer';
+
+    // Pick wording based on whether the pickup date is in the past, today/future, or unknown.
+    // A past collection still needs the shipping label (customer might be posting the pack
+    // themselves at a UPS drop-off) but the wording shouldn't imply the pickup is upcoming.
+    let pickupLine;
+    if (pickupDate) {
+        const pickupAsDate = parsePickupDateUK(pickupDate);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        if (pickupAsDate && pickupAsDate < today) {
+            pickupLine = `Further to our recent telephone conversation, a collection by UPS was arranged for ${pickupDate}. Please find the shipping label attached.`;
+        } else {
+            pickupLine = `Further to our recent telephone conversation, a collection by UPS has been arranged for between 09.00am and 5pm on ${pickupDate}.`;
+        }
+    } else {
+        pickupLine = `Further to our recent telephone conversation regarding the return of your Power Pack, please find the shipping label attached.`;
+    }
+
+    document.getElementById('emailModalTitle').textContent = 'Resend Label — ' + job.jobNumber;
+    document.getElementById('modalRecipient').value = customerEmail || '';
+    document.getElementById('modalSubject').value = `Portable Power - UPS Collection & Shipping Label - ${job.jobNumber}`;
+    document.getElementById('modalBody').value = `Hi ${name}\n\n${pickupLine}\n\nPlease print the attached shipping label and stick it on the box containing your Power Pack.\n\nThe box needs to be large enough to accommodate your power pack, mains charger and both leads, along with sufficient packing material to ensure nothing gets damaged in transit.\n\nI'm afraid that neither UPS, nor Portable Power Ltd. will pay compensation for inadequately packed items.\n\nYour leads must not be connected to the Power Pack, as this creates a serious fire risk.\n\nWith best regards,\nPortable Power LTD`;
+
+    modalContext = {
+        mode: 'archivedResend',
+        jobNumber: job.jobNumber,
+        customerName: name
+    };
+
+    const btn = document.getElementById('modalSendBtn');
+    btn.onclick = sendModalEmail;
+
+    document.getElementById('emailModal').classList.remove('hidden');
+}
+
+// Helper: parse a UK-format date string (DD/MM/YYYY) to a Date object.
+// Returns null if the string doesn't match.
+function parsePickupDateUK(s) {
+    if (!s || typeof s !== 'string') return null;
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) return null;
+    return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+}
+
+function closeEmailModal() {
+    document.getElementById('emailModal').classList.add('hidden');
+    modalContext = null;
+    // Make sure the Send button isn't stuck in a spinning state from an interrupted send
+    const btn = document.getElementById('modalSendBtn');
+    if (btn) setButtonLoading(btn, false);
+}
+
+// Unified send-from-modal handler. Uses modalContext.mode to pick the right action.
+async function sendModalEmail() {
+    if (!modalContext) { showToast('Modal state lost — close and try again.', 'error'); return; }
+
+    const recipient = document.getElementById('modalRecipient').value.trim();
+    const subject = document.getElementById('modalSubject').value.trim();
+    const body = document.getElementById('modalBody').value.trim();
+
+    // Basic email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+        showToast('Please enter a valid email address.', 'warning');
+        return;
+    }
+    if (!subject) { showToast('Subject cannot be empty.', 'warning'); return; }
+    if (!body) { showToast('Email body cannot be empty.', 'warning'); return; }
+
+    const sendBtn = document.getElementById('modalSendBtn');
     setButtonLoading(sendBtn, true, 'Sending...');
+
+    const action = modalContext.mode === 'archivedResend' ? 'resendArchived' : 'resendEmail';
+    const payload = {
+        action: action,
+        jobNumber: modalContext.jobNumber,
+        customerName: modalContext.customerName,
+        customerEmail: recipient,
+        emailSubject: subject,
+        customEmailBody: body
+    };
+    if (modalContext.trackingNumber) payload.trackingNumber = modalContext.trackingNumber;
+
     try {
         const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({
-                action: 'resendEmail', jobNumber: lastBookingData.jobNumber,
-                customerName: lastBookingData.customerName, customerEmail: lastBookingData.customerEmail,
-                emailSubject: document.getElementById('modalSubject').value,
-                customEmailBody: document.getElementById('modalBody').value,
-                trackingNumber: lastUPSResult.trackingNumber
-            })
+            body: JSON.stringify(payload)
         }, 60000);
         const result = await res.json();
-        if (result.success) {
-            closeEmailModal();
-            showToast(`Label sent to ${lastBookingData.customerEmail}`, 'success', 4000);
+        if (!result.success) throw new Error(result.error || 'Send failed');
+
+        // Capture mode before closeEmailModal() clears modalContext
+        const mode = modalContext.mode;
+        closeEmailModal();
+        showToast(`Label sent to ${recipient}`, 'success', 4000);
+
+        // freshResend flow: close the booking portal and refresh the list.
+        // archivedResend flow: stay on the list, nothing else to do.
+        if (mode === 'freshResend') {
             closeBookingPortal();
             loadJobs();
-        } else {
-            throw new Error(result.error);
+        } else if (mode === 'archivedResend') {
+            refreshArchivedJobs(); // pick up any state changes
         }
     } catch (err) {
         showToast('Error sending email: ' + err.message, 'error', 6000);
