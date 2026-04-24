@@ -79,7 +79,6 @@ textarea { resize: vertical; min-height: 80px; }
 .btn-previous { background: #6c757d; color: white; }
 .btn-next { background: #c41e3a; color: white; }
 .btn-submit { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; }
-.btn-save-draft { background: #ffc107; color: #1a2332; font-weight: 700; margin-top: 20px; width: 100%; }
 .validation-msg { background: #fff3cd; border: 2px solid #ffc107; color: #856404; padding: 12px 16px; border-radius: 8px; margin-top: 15px; font-weight: 600; display: none; }
 .validation-msg.show { display: block; }
 .job-selector { padding: 30px; }
@@ -441,7 +440,7 @@ textarea { resize: vertical; min-height: 80px; }
     <!-- ===================== REPAIR FORM ===================== -->
     <div id="repairForm" class="hidden">
         <div class="job-info">
-            <button class="back-to-jobs-btn" onclick="backToJobSelector()"><span style="font-size:18px;">←</span> Back</button>
+            <button class="back-to-jobs-btn" onclick="autoSaveDraft(); backToJobSelector();"><span style="font-size:18px;">←</span> Back</button>
             <div class="job-info-item"><span class="job-info-label">Job Number</span><span id="currentJobNumber">-</span></div>
             <div class="job-info-item" style="text-align:right;">
                 <span class="job-info-label">Customer</span><span id="currentCustomerName">-</span>
@@ -474,7 +473,6 @@ textarea { resize: vertical; min-height: 80px; }
                     </div>
                     <div class="validation-msg" id="validation1">Please confirm the received date.</div>
                     <div class="navigation-buttons"><button type="button" class="btn btn-next" onclick="nextPage()">Next →</button></div>
-                    <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
 
                 <!-- Page 2: Tests -->
@@ -518,7 +516,6 @@ textarea { resize: vertical; min-height: 80px; }
                         <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
                         <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
                     </div>
-                    <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
 
                 <!-- Page 3: Pack inspection -->
@@ -584,7 +581,6 @@ textarea { resize: vertical; min-height: 80px; }
                         <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
                         <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
                     </div>
-                    <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
 
                 <!-- Page 4: Category -->
@@ -626,7 +622,6 @@ textarea { resize: vertical; min-height: 80px; }
                         <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
                         <button type="button" class="btn btn-next" onclick="nextPage()">Next →</button>
                     </div>
-                    <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
 
                 <!-- Page 5: Parts -->
@@ -652,7 +647,6 @@ textarea { resize: vertical; min-height: 80px; }
                         <button type="button" class="btn btn-previous" onclick="previousPage()">← Previous</button>
                         <button type="button" class="btn btn-submit" onclick="submitForm()">Submit Repair Record</button>
                     </div>
-                    <button type="button" class="btn btn-save-draft" onclick="saveDraft()">💾 Save Draft & Exit</button>
                 </div>
             </form>
         </div>
@@ -996,8 +990,31 @@ function validatePage(n) {
     if (n===4) { const c=getPF('category'); return c && (c!=='PAID' || invoiceValue.trim()); }
     return true;
 }
-function nextPage() { if (!validatePage(currentPage)) { document.getElementById('validation'+currentPage).classList.add('show'); return; } if (currentPage<totalPages) showPage(currentPage+1); }
-function previousPage() { if (currentPage>1) showPage(currentPage-1); }
+// Silently save the current form state as a draft — no toast, no redirect.
+// Called automatically on every page transition during a repair, so an
+// interrupted session (tablet crash, battery dies) doesn't lose progress.
+// The draft is deleted when the repair is submitted successfully, so this
+// doesn't accumulate stale data — just covers in-progress repairs.
+function autoSaveDraft() {
+    if (!currentJobData) return;
+    try {
+        localStorage.setItem(`draft_${currentJobData.jobNumber}`, JSON.stringify({
+            jobNumber: currentJobData.jobNumber,
+            currentPage,
+            formData: collectFormData(),
+            serialDigitsValue,
+            timestamp: new Date().toISOString()
+        }));
+    } catch (err) {
+        // localStorage can fail if storage is full or disabled; don't break
+        // the flow, just log. Progress since the last successful autosave is
+        // lost in that edge case, but the repair can still be submitted.
+        console.warn('Auto-save draft failed:', err);
+    }
+}
+
+function nextPage() { if (!validatePage(currentPage)) { document.getElementById('validation'+currentPage).classList.add('show'); return; } if (currentPage<totalPages) { autoSaveDraft(); showPage(currentPage+1); } }
+function previousPage() { if (currentPage>1) { autoSaveDraft(); showPage(currentPage-1); } }
 
 // ============ CSV / DATE PARSING ============
 function parseCSV(text) { const rows=[]; let row=[],field='',q=false; for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1]; if(c==='"'){if(q&&n==='"'){field+='"';i++;}else q=!q;} else if(c===','&&!q){row.push(field);field='';} else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&n==='\n')i++;if(field||row.length){row.push(field);rows.push(row);row=[];field='';}} else field+=c;} if(field||row.length){row.push(field);rows.push(row);} return rows; }
@@ -1242,11 +1259,9 @@ function submitForm() {
 }
 
 // ============ DRAFTS ============
-function saveDraft() {
-    if(!currentJobData) return;
-    localStorage.setItem(`draft_${currentJobData.jobNumber}`,JSON.stringify({jobNumber:currentJobData.jobNumber,currentPage,formData:collectFormData(),serialDigitsValue,timestamp:new Date().toISOString()}));
-    showToast('Draft saved.', 'success'); backToJobSelector();
-}
+// Explicit manual save has been removed — autoSaveDraft() on page transitions
+// and on back-button exit handles everything. Draft is cleared on successful
+// submission so nothing accumulates.
 async function loadDraft(jn) {
     const raw = localStorage.getItem(`draft_${jn}`);
     if (!raw) return false;
