@@ -664,7 +664,13 @@ textarea { resize: vertical; min-height: 80px; }
     <div class="modal-overlay" onclick="closeEmailModal()">
         <div class="modal" onclick="event.stopPropagation()">
             <h3 id="emailModalTitle">Edit Email Before Sending</h3>
-            <div class="form-group"><label for="modalRecipient">To</label><input type="email" id="modalRecipient" placeholder="recipient@example.com"></div>
+            <div class="form-group"><label for="modalRecipient">To</label><input type="email" id="modalRecipient" placeholder="recipient@example.com" oninput="onRecipientChange()"></div>
+            <div class="form-group hidden" id="modalUpdateSheetGroup">
+                <div class="checkbox-item" onclick="toggleCheckbox('modalUpdateSheet')" style="background:#fff3cd;border:2px solid #ffc107;">
+                    <input type="checkbox" id="modalUpdateSheet" checked>
+                    <label>Also update the customer's email in the sheet (recommended — prevents future mis-sends)</label>
+                </div>
+            </div>
             <div class="form-group"><label for="modalSubject">Subject</label><input type="text" id="modalSubject"></div>
             <div class="form-group"><label for="modalBody">Email Body</label><textarea id="modalBody" style="min-height:250px;"></textarea></div>
             <div class="modal-btns">
@@ -1022,7 +1028,28 @@ function parseDateFromSheet(s) {
     }
     return null;
 }
-function getDateCategory(d) { if(!d) return 'future'; const t=new Date();t.setHours(0,0,0,0); const tom=new Date(t);tom.setDate(tom.getDate()+1); const wk=new Date(t);wk.setDate(wk.getDate()+7); const ed=new Date(d);ed.setHours(0,0,0,0); if(ed.getTime()===t.getTime()) return 'today'; if(ed.getTime()===tom.getTime()) return 'tomorrow'; if(ed<=wk) return 'soon'; return 'future'; }
+function getDateCategory(d) {
+    if (!d) return 'future';
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    const tom = new Date(t); tom.setDate(tom.getDate() + 1);
+    const ed = new Date(d); ed.setHours(0, 0, 0, 0);
+
+    if (ed.getTime() === t.getTime()) return 'today';
+    if (ed.getTime() === tom.getTime()) return 'tomorrow';
+
+    // "This week" means any working day up to and including Friday of the
+    // current working week. Anything Saturday or later is "future" — avoids
+    // labelling a Monday arrival as "this week" when it's actually next week.
+    const endOfWeek = new Date(t);
+    const dow = t.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
+    // Days until Friday. If today is Sat (6) or Sun (0), no "this week" remains.
+    const daysToFri = dow >= 1 && dow <= 5 ? 5 - dow : -1;
+    if (daysToFri < 0) return 'future';
+    endOfWeek.setDate(endOfWeek.getDate() + daysToFri);
+
+    if (ed <= endOfWeek) return 'soon';
+    return 'future';
+}
 
 let cachedRows = [];
 
@@ -1506,19 +1533,18 @@ async function submitBookingAndUPS() {
     }
     const expStr=`EXP ${String(expDate.getDate()).padStart(2,'0')}/${String(expDate.getMonth()+1).padStart(2,'0')}`;
 
-    const businessName=document.getElementById('bkBusinessName').value.trim();
-    const customerNameRaw=document.getElementById('bkCustomerName').value.trim();
-    // Combine business + customer into a single name field. Used everywhere the
-    // full identity matters (sheet, UPS label, emails). If no business name, just
-    // the customer name on its own.
-    const customerName = businessName
-        ? `${businessName} - ${customerNameRaw}`
-        : customerNameRaw;
-    const customerAddress=document.getElementById('bkAddress').value.trim();
-    const customerCity=document.getElementById('bkCity').value.trim();
-    const customerPostcode=document.getElementById('bkPostcodeFinal').value.trim().toUpperCase();
-    const customerPhone=document.getElementById('bkPhone').value.trim();
-    const customerEmail=document.getElementById('bkEmail').value.trim();
+    const businessName = document.getElementById('bkBusinessName').value.trim();
+    const customerName = document.getElementById('bkCustomerName').value.trim();
+    const rawAddress = document.getElementById('bkAddress').value.trim();
+    // Business name (if provided) prefixes the address line in the sheet/label —
+    // customer name stays pure (just the person's name) in column F.
+    const customerAddress = businessName
+        ? `${businessName}, ${rawAddress}`
+        : rawAddress;
+    const customerCity = document.getElementById('bkCity').value.trim();
+    const customerPostcode = document.getElementById('bkPostcodeFinal').value.trim().toUpperCase();
+    const customerPhone = document.getElementById('bkPhone').value.trim();
+    const customerEmail = document.getElementById('bkEmail').value.trim();
 
     const bookingData = {
         action:'booking', jobNumber:nextJobNumber, callDate:formatDateUK(todayISO()),
@@ -1732,8 +1758,13 @@ function openResendModal() {
         mode: 'freshResend',
         jobNumber: lastBookingData.jobNumber,
         customerName: lastBookingData.customerName,
-        trackingNumber: lastUPSResult.trackingNumber
+        trackingNumber: lastUPSResult.trackingNumber,
+        originalEmail: lastBookingData.customerEmail || ''
     };
+    // Reset the update-sheet checkbox; onRecipientChange will show it if user edits
+    document.getElementById('modalUpdateSheet').checked = true;
+    document.getElementById('modalUpdateSheet').closest('.checkbox-item').classList.add('checked');
+    document.getElementById('modalUpdateSheetGroup').classList.add('hidden');
 
     // Rewire the Send button to our unified handler
     const btn = document.getElementById('modalSendBtn');
@@ -1772,8 +1803,13 @@ function openArchivedResendModal(job, customerEmail, pickupDate) {
     modalContext = {
         mode: 'archivedResend',
         jobNumber: job.jobNumber,
-        customerName: name
+        customerName: name,
+        originalEmail: customerEmail || ''
     };
+    // Reset and hide the update-sheet checkbox; onRecipientChange will show it if user edits
+    document.getElementById('modalUpdateSheet').checked = true;
+    document.getElementById('modalUpdateSheet').closest('.checkbox-item').classList.add('checked');
+    document.getElementById('modalUpdateSheetGroup').classList.add('hidden');
 
     const btn = document.getElementById('modalSendBtn');
     btn.onclick = sendModalEmail;
@@ -1796,6 +1832,20 @@ function closeEmailModal() {
     // Make sure the Send button isn't stuck in a spinning state from an interrupted send
     const btn = document.getElementById('modalSendBtn');
     if (btn) setButtonLoading(btn, false);
+}
+
+// Compare typed recipient against the original email on file. Show the
+// "also update the sheet" option only when they differ — otherwise it's noise.
+function onRecipientChange() {
+    if (!modalContext) return;
+    const typed = document.getElementById('modalRecipient').value.trim().toLowerCase();
+    const original = (modalContext.originalEmail || '').trim().toLowerCase();
+    const group = document.getElementById('modalUpdateSheetGroup');
+    if (typed && typed !== original) {
+        group.classList.remove('hidden');
+    } else {
+        group.classList.add('hidden');
+    }
 }
 
 // Unified send-from-modal handler. Uses modalContext.mode to pick the right action.
@@ -1828,6 +1878,15 @@ async function sendModalEmail() {
     };
     if (modalContext.trackingNumber) payload.trackingNumber = modalContext.trackingNumber;
 
+    // If the user has changed the recipient from what was on file AND ticked the
+    // "also update the sheet" option, pass a flag so the server updates column J.
+    const recipientChanged = recipient.toLowerCase() !== (modalContext.originalEmail || '').toLowerCase();
+    const updateChk = document.getElementById('modalUpdateSheet');
+    const shouldUpdateSheet = recipientChanged && updateChk && updateChk.checked;
+    if (shouldUpdateSheet) {
+        payload.updateSheetEmail = true;
+    }
+
     try {
         const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
             method: 'POST',
@@ -1842,7 +1901,13 @@ async function sendModalEmail() {
         const pickupFailed = mode === 'freshResend' && lastUPSResult && lastUPSResult.pickupFailed;
         const jobNum = modalContext.jobNumber;
         closeEmailModal();
-        showToast(`Label sent to ${recipient}`, 'success', 4000);
+
+        // Confirm what happened. If we also updated the sheet email, mention it.
+        if (shouldUpdateSheet) {
+            showToast(`Label sent to ${recipient} — sheet email updated for ${jobNum}`, 'success', 5000);
+        } else {
+            showToast(`Label sent to ${recipient}`, 'success', 4000);
+        }
 
         // freshResend flow: close the booking portal and refresh the list.
         // archivedResend flow: nothing else to do — user stays on the main list.
