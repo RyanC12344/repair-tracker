@@ -360,6 +360,19 @@ textarea { resize: vertical; min-height: 80px; }
 
             <div class="form-group"><label for="bkPickupDate">Collection Date <span class="sub-label">(UPS pickup from customer)</span></label><input type="date" id="bkPickupDate"></div>
 
+            <div class="form-group">
+                <div class="checkbox-item" onclick="toggleCheckbox('bkPickupTimeToggle'); togglePickupTimeWindow('bk')">
+                    <input type="checkbox" id="bkPickupTimeToggle"><label>Specify pickup time window <span class="sub-label" style="font-weight:normal;">(default: 09:00–17:00 all day)</span></label>
+                </div>
+                <div id="bkPickupTimeOptions" class="hidden" style="margin-top:12px;">
+                    <div class="radio-group" data-pf="bkPickupTime">
+                        <div class="radio-item" data-pf="bkPickupTime" data-val="morning" onclick="selectPF(this)">Morning (09:00–13:00)</div>
+                        <div class="radio-item checked" data-pf="bkPickupTime" data-val="allday" onclick="selectPF(this)">All Day (09:00–17:00)</div>
+                        <div class="radio-item" data-pf="bkPickupTime" data-val="afternoon" onclick="selectPF(this)">Afternoon (13:00–17:00)</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="validation-msg" id="bookingValidation">Please fill in all required fields: name, street address, town/city, postcode, phone, a valid email address, and pickup date.</div>
 
             <div class="navigation-buttons">
@@ -410,6 +423,19 @@ textarea { resize: vertical; min-height: 80px; }
                 </div>
             </div>
             <div class="form-group"><label for="rbPickupDate">New Collection Date</label><input type="date" id="rbPickupDate"></div>
+
+            <div class="form-group">
+                <div class="checkbox-item" onclick="toggleCheckbox('rbPickupTimeToggle'); togglePickupTimeWindow('rb')">
+                    <input type="checkbox" id="rbPickupTimeToggle"><label>Specify pickup time window <span class="sub-label" style="font-weight:normal;">(default: 09:00–17:00 all day)</span></label>
+                </div>
+                <div id="rbPickupTimeOptions" class="hidden" style="margin-top:12px;">
+                    <div class="radio-group" data-pf="rbPickupTime">
+                        <div class="radio-item" data-pf="rbPickupTime" data-val="morning" onclick="selectPF(this)">Morning (09:00–13:00)</div>
+                        <div class="radio-item checked" data-pf="rbPickupTime" data-val="allday" onclick="selectPF(this)">All Day (09:00–17:00)</div>
+                        <div class="radio-item" data-pf="rbPickupTime" data-val="afternoon" onclick="selectPF(this)">Afternoon (13:00–17:00)</div>
+                    </div>
+                </div>
+            </div>
 
             <div class="navigation-buttons">
                 <button type="button" class="btn btn-submit" onclick="submitRebook()" id="rebookSubmitBtn">Rebook Pickup</button>
@@ -878,6 +904,27 @@ function numpadClear() { clearNoSNState(); serialDigitsValue = ''; updateSerialD
 function toggleCheckbox(id) { const cb = document.getElementById(id); cb.checked = !cb.checked; cb.closest('.checkbox-item').classList.toggle('checked', cb.checked); }
 function selectPF(el) { document.querySelectorAll(`[data-pf="${el.dataset.pf}"]`).forEach(n => n.classList.remove('checked')); el.classList.add('checked'); }
 function getPF(group) { const s = document.querySelector(`[data-pf="${group}"].checked`); return s ? s.dataset.val : ''; }
+
+// Show/hide the pickup time window radio group based on toggle state.
+// `prefix` is 'bk' (booking) or 'rb' (rebook).
+function togglePickupTimeWindow(prefix) {
+    const checked = document.getElementById(prefix + 'PickupTimeToggle').checked;
+    document.getElementById(prefix + 'PickupTimeOptions').classList.toggle('hidden', !checked);
+}
+
+// Resolve the chosen window into UPS-formatted ready/close times.
+// Returns { readyTime: 'HHMM', closeTime: 'HHMM' }. Falls back to all-day if nothing selected.
+// `prefix` is 'bk' or 'rb' to read the right radio group.
+function resolvePickupWindow(prefix) {
+    const toggle = document.getElementById(prefix + 'PickupTimeToggle');
+    if (!toggle || !toggle.checked) {
+        return { readyTime: '0900', closeTime: '1700' }; // all-day default
+    }
+    const choice = getPF(prefix + 'PickupTime') || 'allday';
+    if (choice === 'morning')   return { readyTime: '0900', closeTime: '1300' };
+    if (choice === 'afternoon') return { readyTime: '1300', closeTime: '1700' };
+    return { readyTime: '0900', closeTime: '1700' };
+}
 function toggleInvoiceField() { document.getElementById('invoiceRow').classList.toggle('show', getPF('category') === 'PAID'); }
 
 // NO S/N
@@ -1352,6 +1399,14 @@ function openBookingPortal() {
     document.getElementById('boxConfigSection').classList.add('hidden');
     document.getElementById('bookingSubmitBtn').textContent='Book Repair, Generate Label & Schedule Pickup';
     document.getElementById('bookingSubmitBtn').disabled=false;
+    // Reset pickup time window: untick toggle, hide options, default radio back to "All Day"
+    const bkTimeToggle = document.getElementById('bkPickupTimeToggle');
+    bkTimeToggle.checked = false;
+    bkTimeToggle.closest('.checkbox-item').classList.remove('checked');
+    document.getElementById('bkPickupTimeOptions').classList.add('hidden');
+    document.querySelectorAll('[data-pf="bkPickupTime"]').forEach(el => {
+        el.classList.toggle('checked', el.dataset.val === 'allday');
+    });
     clearBookingState();
     window.scrollTo(0,0);
 }
@@ -1596,10 +1651,12 @@ async function submitBookingAndUPS() {
         // are already saved with real tracking numbers, so we treat it as a partial
         // success: email can still go out, and you go to Rebook to schedule collection.
         setButtonLoading(btn, true, 'Scheduling pickup...');
+        const pickupWindow = resolvePickupWindow('bk');
         const pickupData = {
             action:'schedulePickup', jobNumber:nextJobNumber,
             customerName, customerAddress, customerCity, customerPostcode, customerPhone,
-            packCount:bookingPackCount, pickupDate:formatDateUK(pickupISO), pickupDateISO:pickupISO
+            packCount:bookingPackCount, pickupDate:formatDateUK(pickupISO), pickupDateISO:pickupISO,
+            readyTime: pickupWindow.readyTime, closeTime: pickupWindow.closeTime
         };
         let pickupResult = null;
         let pickupError = null;
@@ -1959,6 +2016,14 @@ function openRebookModal() {
     document.getElementById('rbPickupDate').value='';
     rebookPackCount=1;
     document.querySelectorAll('#rebookPortal .pack-count-btn').forEach(b=>b.classList.toggle('selected',b.dataset.rpacks==='1'));
+    // Reset pickup time window: untick toggle, hide options, default radio back to "All Day"
+    const rbTimeToggle = document.getElementById('rbPickupTimeToggle');
+    rbTimeToggle.checked = false;
+    rbTimeToggle.closest('.checkbox-item').classList.remove('checked');
+    document.getElementById('rbPickupTimeOptions').classList.add('hidden');
+    document.querySelectorAll('[data-pf="rbPickupTime"]').forEach(el => {
+        el.classList.toggle('checked', el.dataset.val === 'allday');
+    });
     window.scrollTo(0,0);
 }
 function closeRebookPortal() { document.getElementById('rebookPortal').classList.add('hidden'); document.getElementById('jobSelector').classList.remove('hidden'); }
@@ -2020,6 +2085,7 @@ async function submitRebook() {
 
     const btn = document.getElementById('rebookSubmitBtn');
     setButtonLoading(btn, true, 'Rebooking...');
+    const pickupWindow = resolvePickupWindow('rb');
     try {
         const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
             method: 'POST',
@@ -2029,7 +2095,8 @@ async function submitRebook() {
                 customerName: name, customerAddress: addr,
                 customerCity: city || addr.split(',').pop().trim(),
                 customerPostcode: pc.toUpperCase(), customerPhone: phone,
-                packCount: rebookPackCount, pickupDateISO: pickup
+                packCount: rebookPackCount, pickupDateISO: pickup,
+                readyTime: pickupWindow.readyTime, closeTime: pickupWindow.closeTime
             })
         }, 60000);
         const result = await res.json();
