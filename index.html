@@ -1124,12 +1124,58 @@ async function loadJobs() {
         const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`);
         const text = (await res.text()).replace(/^\uFEFF/, ''); // strip BOM if present
         const allRows = parseCSV(text); cachedRows = allRows; const rows = allRows.slice(1);
+
+        // Also pull last month's tab so bookings from late last month still show up
+        // as "expected" or "current" — a pack booked on 30 April with EXP 02 May would
+        // otherwise vanish from view as soon as the calendar flips to May.
+        // We only keep rows that aren't yet completed (no serial filled in).
+        let lastMonthRows = [];
+        try {
+            // MONTH_GIDS is keyed 1-12 (Jan=1, May=5). For previous month: subtract 1.
+            // In January (currentMonth=1) there's no previous month in the same year sheet,
+            // so we skip — this is the 2026 sheet only.
+            const currentMonth = new Date().getMonth() + 1; // 1-12
+            const prevMonth = currentMonth - 1;
+            if (prevMonth >= 1 && MONTH_GIDS[prevMonth] !== null && MONTH_GIDS[prevMonth] !== undefined) {
+                const prevRes = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${MONTH_GIDS[prevMonth]}`);
+                const prevText = (await prevRes.text()).replace(/^\uFEFF/, '');
+                const prevAllRows = parseCSV(prevText);
+                lastMonthRows = prevAllRows.slice(1);
+            }
+        } catch (prevErr) {
+            // Non-fatal — just means we miss carried-over jobs. Log and continue.
+            console.warn('Could not load previous month tab:', prevErr);
+        }
+
         document.getElementById('loadingJobs').classList.add('hidden');
         document.getElementById('currentMonthDisplay').textContent = `Viewing: ${month} ${new Date().getFullYear()}`;
         const today = new Date(); today.setHours(0,0,0,0);
+
+        // Map current-month rows. Each gets its sheet row index for any later writes.
         const all = rows.map((r,i) => ({jobNumber:r[0]||'',customerName:r[5]||'',customerAddress:r[6]||'',packReceived:r[4]||'',serialNumber:r[13]||'',rowIndex:i+2}));
+
+        // Map last-month's rows but only keep ones still pending: must have packReceived,
+        // must NOT have a serial number (= not yet repaired). Completed jobs from last
+        // month stay where they belong — last month's tab.
+        const lastMonthPending = lastMonthRows
+            .map(r => ({jobNumber:r[0]||'',customerName:r[5]||'',customerAddress:r[6]||'',packReceived:r[4]||'',serialNumber:r[13]||''}))
+            .filter(row => {
+                if (!row.jobNumber || !row.packReceived) return false;
+                if (row.serialNumber && row.serialNumber.trim() !== '') return false;
+                return true;
+            });
+
+        // Combine; dedupe by job number in case a row got duplicated.
+        const seen = new Set();
+        const combined = [];
+        [...all, ...lastMonthPending].forEach(row => {
+            if (!row.jobNumber || seen.has(row.jobNumber)) return;
+            seen.add(row.jobNumber);
+            combined.push(row);
+        });
+
         const exp=[],arr=[],comp=[];
-        all.forEach(row => {
+        combined.forEach(row => {
             if(!row.packReceived) return;
             const hasSerial = row.serialNumber && row.serialNumber.trim()!=='';
             if(String(row.packReceived).toUpperCase().startsWith('EXP')) {
