@@ -129,9 +129,9 @@ textarea { resize: vertical; min-height: 80px; }
 .email-suffix-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .email-suffix-btn { padding: 8px 14px; background: #e7f3ff; border: 2px solid #667eea; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 600; color: #667eea; }
 .email-suffix-btn:hover { background: #667eea; color: white; }
-.pack-count-row { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
-.pack-count-btn { flex: 1; min-width: 70px; padding: 18px; text-align: center; background: #f8f9fa; border: 2px solid transparent; border-radius: 8px; font-weight: 700; font-size: 18px; cursor: pointer; }
-.pack-count-btn.selected { background: #d4edda; border-color: #28a745; color: #155724; }
+.-row { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.-btn { flex: 1; min-width: 70px; padding: 18px; text-align: center; background: #f8f9fa; border: 2px solid transparent; border-radius: 8px; font-weight: 700; font-size: 18px; cursor: pointer; }
+.-btn.selected { background: #d4edda; border-color: #28a745; color: #155724; }
 .pack-weight { text-align: center; margin-top: 10px; font-size: 15px; color: #666; font-weight: 600; }
 
 /* UPS action buttons */
@@ -346,7 +346,13 @@ textarea { resize: vertical; min-height: 80px; }
                     <div class="pack-count-btn selected" data-packs="1" onclick="selectPackCount(this)">1</div>
                     <div class="pack-count-btn" data-packs="2" onclick="selectPackCount(this)">2</div>
                     <div class="pack-count-btn" data-packs="3" onclick="selectPackCount(this)">3</div>
-                    <div class="pack-count-btn" data-packs="4" onclick="selectPackCount(this)">4</div>
+                    <div class="pack-count-btn" data-packs="more" onclick="selectPackCount(this)">4+</div>
+                </div>
+                <div class="hidden" id="packCountMoreRow" style="margin-top:10px;">
+                    <label for="bkPackCountMore" style="font-size:14px;color:#666;font-weight:600;">How many packs?</label>
+                    <input type="number" id="bkPackCountMore" min="4" max="12" value="4"
+                           oninput="onPackCountMoreInput()" onblur="normalisePackCountMore()"
+                           style="max-width:140px;margin-top:6px;">
                 </div>
                 <div class="pack-weight" id="packWeightDisplay">Shipment weight: 10 kg</div>
             </div>
@@ -1438,8 +1444,10 @@ function openBookingPortal() {
     ['bkBusinessName','bkCustomerName','bkPostcode','bkAddress','bkCity','bkPostcodeFinal','bkPhone','bkEmail','bkFault'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('bkPickupDate').value='';
     document.getElementById('addressResults').classList.add('hidden');
-    bookingPackCount=1;
+bookingPackCount=1;
     boxConfig=[10];
+    document.getElementById('packCountMoreRow').classList.add('hidden');
+    document.getElementById('bkPackCountMore').value = 4;
     document.querySelectorAll('#bookingPortal .pack-count-btn').forEach(b=>b.classList.toggle('selected',b.dataset.packs==='1'));
     document.getElementById('packWeightDisplay').textContent='Total weight: 10 kg';
     document.getElementById('boxConfigSection').classList.add('hidden');
@@ -1462,11 +1470,15 @@ function closeBookingPortal() {
     clearBookingState();
 }
 
-function selectPackCount(el) {
-    el.closest('.pack-count-row').querySelectorAll('.pack-count-btn').forEach(b=>b.classList.remove('selected'));
-    el.classList.add('selected');
-    bookingPackCount=parseInt(el.dataset.packs);
+function clampPackCount(v) {
+    const n = parseInt(v, 10);
+    if (isNaN(n) || n < 4) return 4;
+    return Math.min(n, 12);
+}
 
+// Rebuild the box list to match the current pack count. Shared by the
+// 1/2/3 buttons and the "4+" number input so they can't drift apart.
+function applyPackCount() {
     const boxSection = document.getElementById('boxConfigSection');
     if (bookingPackCount > 1) {
         boxSection.classList.remove('hidden');
@@ -1478,6 +1490,41 @@ function selectPackCount(el) {
         boxConfig = [10];
     }
     refreshPackWeightDisplay();
+}
+
+function selectPackCount(el) {
+    el.closest('.pack-count-row').querySelectorAll('.pack-count-btn').forEach(b=>b.classList.remove('selected'));
+    el.classList.add('selected');
+
+    const moreRow = document.getElementById('packCountMoreRow');
+    if (el.dataset.packs === 'more') {
+        moreRow.classList.remove('hidden');
+        const input = document.getElementById('bkPackCountMore');
+        bookingPackCount = clampPackCount(input.value);
+        input.value = bookingPackCount;
+        input.focus();
+    } else {
+        moreRow.classList.add('hidden');
+        bookingPackCount = parseInt(el.dataset.packs);
+    }
+    applyPackCount();
+}
+
+// Fires on every keystroke. Ignore anything under 4 so typing "12" doesn't
+// briefly snap to 4 the moment the "1" lands.
+function onPackCountMoreInput() {
+    const n = parseInt(document.getElementById('bkPackCountMore').value, 10);
+    if (isNaN(n) || n < 4) return;
+    bookingPackCount = Math.min(n, 12);
+    applyPackCount();
+}
+
+// On blur, force whatever's in the box into range (handles empty / 2 / 99).
+function normalisePackCountMore() {
+    const input = document.getElementById('bkPackCountMore');
+    input.value = clampPackCount(input.value);
+    bookingPackCount = parseInt(input.value, 10);
+    applyPackCount();
 }
 
 function renderBoxConfig() {
@@ -1677,15 +1724,31 @@ async function submitBookingAndUPS() {
         const bookResult=await bookRes.json();
         if(!bookResult.success) throw new Error(bookResult.error||'Booking save failed');
 
-        // Step 2: Generate UPS label(s) — one per box
+     // Step 2: Generate UPS label(s) — one per box
         setButtonLoading(btn, true, 'Generating UPS label(s)...');
         const boxes = bookingPackCount > 1 ? boxConfig : [bookingPackCount * 10];
+
+        // Work out which job rows sit in which box, in order. A 20kg box holds
+        // 2 packs, 30kg holds 3, etc. The server writes each box's tracking
+        // number to every row in its list — without this, all boxes write to
+        // row #1 and overwrite each other.
+        let jobCursor = 1;
+        const boxJobs = boxes.map(w => {
+            const n = Math.max(1, Math.round(w / 10));
+            const jobs = [];
+            for (let k = 0; k < n; k++) {
+                jobs.push(bookingPackCount > 1 ? `${nextJobNumber} #${jobCursor++}` : nextJobNumber);
+            }
+            return jobs;
+        });
+
         const labelResults = [];
         for (let b = 0; b < boxes.length; b++) {
             const labelData = {
                 action:'generateLabel', jobNumber:nextJobNumber,
                 customerName, customerAddress, customerCity, customerPostcode, customerPhone, customerEmail,
-                weight: boxes[b], packCount: bookingPackCount
+                weight: boxes[b], packCount: bookingPackCount,
+                boxIndex: b + 1, boxJobs: boxJobs[b]
             };
             const labelRes=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(labelData)}, 60000);
             const labelResult=await labelRes.json();
@@ -1698,10 +1761,14 @@ async function submitBookingAndUPS() {
         // success: email can still go out, and you go to Rebook to schedule collection.
         setButtonLoading(btn, true, 'Scheduling pickup...');
         const pickupWindow = resolvePickupWindow('bk');
-        const pickupData = {
+       const pickupData = {
             action:'schedulePickup', jobNumber:nextJobNumber,
             customerName, customerAddress, customerCity, customerPostcode, customerPhone,
-            packCount:bookingPackCount, pickupDate:formatDateUK(pickupISO), pickupDateISO:pickupISO,
+            packCount:bookingPackCount,
+            // UPS counts BOXES, not packs. 7 packs in 3 boxes is a 3-piece collection.
+            boxCount: boxes.length,
+            totalWeight: boxes.reduce((a, b) => a + b, 0),
+            pickupDate:formatDateUK(pickupISO), pickupDateISO:pickupISO,
             readyTime: pickupWindow.readyTime, closeTime: pickupWindow.closeTime
         };
         let pickupResult = null;
@@ -1735,8 +1802,12 @@ async function submitBookingAndUPS() {
         saveBookingState();
 
         const packText = bookingPackCount > 1 ? `(${bookingPackCount} packs: ${nextJobNumber} #1 to #${bookingPackCount})` : '';
-        const trackingList = labelResults.map((r, i) => `Box ${i+1}: <strong>${r.trackingNumber}</strong>`).join('<br>');
-
+const trackingList = labelResults.map((r, i) => {
+            const jobs = boxJobs[i] || [];
+            const suffixes = jobs.map(j => j.includes('#') ? '#' + j.split('#')[1].trim() : '').filter(Boolean);
+            const label = suffixes.length ? `Box ${i+1} (${suffixes.join(', ')})` : `Box ${i+1}`;
+            return `${label}: <strong>${r.trackingNumber}</strong>`;
+        }).join('<br>');
         if (pickupResult) {
             // Full success — same as before
             document.getElementById('upsSuccessMsg').innerHTML = `
