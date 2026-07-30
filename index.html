@@ -235,6 +235,11 @@ textarea { resize: vertical; min-height: 80px; }
 .collection-meta { font-size:14px; color:#555; margin-top:4px; line-height:1.5; }
 .collection-track { font-family:'Courier New',monospace; font-size:13px; color:#666; margin-top:6px; }
 .collection-rebook { margin-top:10px; padding:9px 16px; background:#c41e3a; color:white; border:none; border-radius:6px; font-weight:700; font-size:14px; cursor:pointer; }
+.collection-dismiss { margin-top:10px; margin-left:8px; padding:9px 16px; background:#6c757d; color:white; border:none; border-radius:6px; font-weight:700; font-size:14px; cursor:pointer; }
+.collection-restore { margin-top:10px; padding:9px 16px; background:#17a2b8; color:white; border:none; border-radius:6px; font-weight:700; font-size:14px; cursor:pointer; }
+.collection-card.dismissed { opacity:0.6; background:#f1f3f5; border-left-color:#adb5bd; }
+.dismissed-bar { display:flex; align-items:center; justify-content:space-between; gap:10px; background:#f1f3f5; border:1px solid #dee2e6; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:14px; color:#555; }
+.dismissed-bar button { padding:7px 14px; background:#6c757d; color:white; border:none; border-radius:6px; font-weight:600; font-size:13px; cursor:pointer; white-space:nowrap; }
 .collection-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
 .collection-summary div { padding:8px 6px; border-radius:8px; text-align:center; color:white; }
 .cs-missed { background:#dc3545; } .cs-awaiting { background:#e0a800; } .cs-collected { background:#28a745; }
@@ -511,6 +516,7 @@ textarea { resize: vertical; min-height: 80px; }
                 <span id="collectionsChecked" style="font-size:13px;color:#888;"></span>
             </div>
             <div class="loading" id="collectionsLoading">Loading collections...</div>
+            <div id="dismissedBar" class="dismissed-bar hidden"></div>
             <div id="collectionsList"></div>
         </div>
     </div>
@@ -2395,11 +2401,14 @@ document.addEventListener('keydown', function(e) {
 //   amber  = collection due today or later, nothing yet — normal
 //   blue   = delivered to us but not booked in on the bench
 let collectionsData = [];
+let showDismissed = false;      // whether hidden collections are currently listed
+let dismissedCount = 0;
 
 function openCollectionsPortal() {
     document.getElementById('jobSelector').classList.add('hidden');
     document.getElementById('collectionsPortal').classList.remove('hidden');
     document.getElementById('collectionsError').classList.add('hidden');
+    showDismissed = false;
     window.scrollTo(0, 0);
     loadCollections(false);
 }
@@ -2440,12 +2449,13 @@ async function loadCollections(force) {
         const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'getCollections', force: !!force })
+            body: JSON.stringify({ action: 'getCollections', force: !!force, includeDismissed: showDismissed })
         }, 180000);
         const result = await res.json();
         if (!result.success) throw new Error(result.error || 'Failed to load collections');
 
         collectionsData = result.collections || [];
+        dismissedCount = result.dismissedCount || 0;
         renderCollections();
         const when = result.checkedAt ? new Date(result.checkedAt) : new Date();
         document.getElementById('collectionsChecked').textContent =
@@ -2468,9 +2478,12 @@ function renderCollections() {
     let missed = 0, awaiting = 0, collected = 0;
     const decorated = collectionsData.map(c => {
         const k = classifyCollection(c);
-        if (k.cls === 'missed') missed++;
-        else if (k.cls === 'awaiting') awaiting++;
-        else if (k.cls === 'collected' || k.cls === 'delivered') collected++;
+        // Hidden ones don't count towards the totals — they're not being chased
+        if (!c.dismissed) {
+            if (k.cls === 'missed') missed++;
+            else if (k.cls === 'awaiting') awaiting++;
+            else if (k.cls === 'collected' || k.cls === 'delivered') collected++;
+        }
         return { c, k };
     });
 
@@ -2484,6 +2497,24 @@ function renderCollections() {
         return (a.c.pickupDateISO || '9999').localeCompare(b.c.pickupDateISO || '9999');
     });
 
+    // Bar showing how many are hidden, with a toggle to reveal them
+    const bar = document.getElementById('dismissedBar');
+    if (dismissedCount > 0 || showDismissed) {
+        bar.classList.remove('hidden');
+        bar.innerHTML = '';
+        const label = document.createElement('span');
+        label.textContent = dismissedCount === 1
+            ? '1 collection hidden as not happening'
+            : dismissedCount + ' collections hidden as not happening';
+        const toggle = document.createElement('button');
+        toggle.textContent = showDismissed ? 'Hide them again' : 'Show hidden';
+        toggle.onclick = () => { showDismissed = !showDismissed; loadCollections(false); };
+        bar.appendChild(label);
+        bar.appendChild(toggle);
+    } else {
+        bar.classList.add('hidden');
+    }
+
     if (!decorated.length) {
         listEl.innerHTML = '<p style="text-align:center;color:#666;padding:20px;">No outstanding collections. Everything booked has been received.</p>';
         return;
@@ -2491,7 +2522,7 @@ function renderCollections() {
 
     decorated.forEach(({ c, k }) => {
         const card = document.createElement('div');
-        card.className = 'collection-card ' + k.cls;
+        card.className = 'collection-card ' + k.cls + (c.dismissed ? ' dismissed' : '');
 
         const jobs = c.jobNumbers.join(', ');
         const addr = [c.customerAddress, c.postcode].filter(Boolean).join(', ');
@@ -2501,9 +2532,10 @@ function renderCollections() {
         const scanLine = c.lastScan
             ? `<div class="collection-meta">Last UPS scan: ${c.lastScan}${c.lastScanAt ? ' — ' + c.lastScanAt : ''}</div>`
             : '';
+        const statusLabel = c.dismissed ? '🚫 Hidden — not happening' : k.label;
 
         card.innerHTML = `
-            <div class="collection-status">${k.label}</div>
+            <div class="collection-status">${statusLabel}</div>
             <div class="collection-name">${c.customerName || '(no name)'}</div>
             <div class="collection-meta">${addr || '(no address)'}</div>
             <div class="collection-meta"><strong>${jobs}</strong> &nbsp;•&nbsp; Collection booked: ${dateText}</div>
@@ -2511,18 +2543,82 @@ function renderCollections() {
             <div class="collection-track">${c.trackingNumber}</div>
         `;
 
-        // Rebook is offered wherever the collection hasn't happened yet: red (UPS
-        // didn't turn up) and amber (still due, but the customer wants a different
-        // day). Not on green — the pack is already with UPS.
-        if (k.cls === 'missed' || k.cls === 'awaiting' || k.cls === '') {
-            const rb = document.createElement('button');
-            rb.className = 'collection-rebook';
-            rb.textContent = k.cls === 'missed' ? 'Rebook this collection' : 'Change collection date';
-            rb.onclick = () => rebookFromCollection(c);
-            card.appendChild(rb);
+        if (c.dismissed) {
+            const rs = document.createElement('button');
+            rs.className = 'collection-restore';
+            rs.textContent = 'Put back on the list';
+            rs.onclick = () => restoreCollection(c);
+            card.appendChild(rs);
+        } else {
+            // Rebook is offered wherever the collection hasn't happened yet: red (UPS
+            // didn't turn up) and amber (still due, but the customer wants a different
+            // day). Not on green — the pack is already with UPS.
+            if (k.cls === 'missed' || k.cls === 'awaiting' || k.cls === '') {
+                const rb = document.createElement('button');
+                rb.className = 'collection-rebook';
+                rb.textContent = k.cls === 'missed' ? 'Rebook this collection' : 'Change collection date';
+                rb.onclick = () => rebookFromCollection(c);
+                card.appendChild(rb);
+
+                const dm = document.createElement('button');
+                dm.className = 'collection-dismiss';
+                dm.textContent = 'Not happening — hide';
+                dm.onclick = () => dismissCollection(c);
+                card.appendChild(dm);
+            }
         }
         listEl.appendChild(card);
     });
+}
+
+// Hide a collection that was cancelled by phone but never cancelled at UPS.
+// It stays hidden unless UPS scans the box later, in which case it comes back
+// on its own — a scan is a fact, the cancellation was only what we were told.
+async function dismissCollection(c) {
+    const ok = await confirmDialog({
+        title: 'Hide this collection?',
+        message: `${c.customerName || 'This customer'} — ${c.jobNumbers.join(', ')}\n\nThis removes it from the pending list. Use it when a collection has been cancelled with the customer but not cancelled at UPS.\n\nIt'll reappear on its own if UPS scans the box after all.`,
+        okText: 'Hide it',
+        cancelText: 'Cancel'
+    });
+    if (!ok) return;
+
+    try {
+        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+                action: 'dismissCollection',
+                trackingNumber: c.trackingNumber,
+                jobNumbers: c.jobNumbers
+            })
+        }, 30000);
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Could not hide it');
+        showToast('Collection hidden', 'success');
+        loadCollections(false);
+    } catch (err) {
+        showToast('Could not hide collection: ' + err.message, 'error', 6000);
+    }
+}
+
+async function restoreCollection(c) {
+    try {
+        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+                action: 'restoreCollection',
+                trackingNumber: c.trackingNumber
+            })
+        }, 30000);
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Could not restore it');
+        showToast('Back on the list', 'success');
+        loadCollections(false);
+    } catch (err) {
+        showToast('Could not restore collection: ' + err.message, 'error', 6000);
+    }
 }
 
 // Jump straight into the existing rebook flow with the job number filled in.
