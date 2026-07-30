@@ -235,8 +235,13 @@ textarea { resize: vertical; min-height: 80px; }
 .collection-meta { font-size:14px; color:#555; margin-top:4px; line-height:1.5; }
 .collection-track { font-family:'Courier New',monospace; font-size:13px; color:#666; margin-top:6px; }
 .collection-rebook { margin-top:10px; padding:9px 16px; background:#c41e3a; color:white; border:none; border-radius:6px; font-weight:700; font-size:14px; cursor:pointer; }
-.collection-dismiss { margin-top:10px; margin-left:8px; padding:9px 16px; background:#6c757d; color:white; border:none; border-radius:6px; font-weight:700; font-size:14px; cursor:pointer; }
 .collection-restore { margin-top:10px; padding:9px 16px; background:#17a2b8; color:white; border:none; border-radius:6px; font-weight:700; font-size:14px; cursor:pointer; }
+/* Swipe-left-to-hide. The wrapper holds a fixed backdrop; the card slides over it. */
+.collection-swipe { position:relative; overflow:hidden; border-radius:8px; margin-bottom:12px; }
+.collection-swipe-bg { position:absolute; inset:0; background:#6c757d; color:white; display:flex; align-items:center; justify-content:flex-end; padding-right:22px; font-weight:700; font-size:15px; opacity:0; pointer-events:none; }
+.collection-swipe .collection-card { margin-bottom:0; position:relative; touch-action:pan-y; user-select:none; }
+.collection-swipe .collection-card.swipeable { cursor:grab; }
+.swipe-hint { font-size:12px; color:#999; margin-top:6px; font-style:italic; }
 .collection-card.dismissed { opacity:0.6; background:#f1f3f5; border-left-color:#adb5bd; }
 .dismissed-bar { display:flex; align-items:center; justify-content:space-between; gap:10px; background:#f1f3f5; border:1px solid #dee2e6; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:14px; color:#555; }
 .dismissed-bar button { padding:7px 14px; background:#6c757d; color:white; border:none; border-radius:6px; font-weight:600; font-size:13px; cursor:pointer; white-space:nowrap; }
@@ -2521,6 +2526,14 @@ function renderCollections() {
     }
 
     decorated.forEach(({ c, k }) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'collection-swipe';
+
+        const bg = document.createElement('div');
+        bg.className = 'collection-swipe-bg';
+        bg.textContent = 'Hide  ✕';
+        wrapper.appendChild(bg);
+
         const card = document.createElement('div');
         card.className = 'collection-card ' + k.cls + (c.dismissed ? ' dismissed' : '');
 
@@ -2534,6 +2547,10 @@ function renderCollections() {
             : '';
         const statusLabel = c.dismissed ? '🚫 Hidden — not happening' : k.label;
 
+        // Swipe applies where the collection hasn't happened yet. Hiding a pack that
+        // UPS has already scanned would make no sense.
+        const canHide = !c.dismissed && (k.cls === 'missed' || k.cls === 'awaiting' || k.cls === '');
+
         card.innerHTML = `
             <div class="collection-status">${statusLabel}</div>
             <div class="collection-name">${c.customerName || '(no name)'}</div>
@@ -2541,6 +2558,7 @@ function renderCollections() {
             <div class="collection-meta"><strong>${jobs}</strong> &nbsp;•&nbsp; Collection booked: ${dateText}</div>
             ${scanLine}
             <div class="collection-track">${c.trackingNumber}</div>
+            ${canHide ? '<div class="swipe-hint">Swipe left to hide if this collection isn\'t happening</div>' : ''}
         `;
 
         if (c.dismissed) {
@@ -2549,40 +2567,95 @@ function renderCollections() {
             rs.textContent = 'Put back on the list';
             rs.onclick = () => restoreCollection(c);
             card.appendChild(rs);
-        } else {
-            // Rebook is offered wherever the collection hasn't happened yet: red (UPS
-            // didn't turn up) and amber (still due, but the customer wants a different
-            // day). Not on green — the pack is already with UPS.
-            if (k.cls === 'missed' || k.cls === 'awaiting' || k.cls === '') {
-                const rb = document.createElement('button');
-                rb.className = 'collection-rebook';
-                rb.textContent = k.cls === 'missed' ? 'Rebook this collection' : 'Change collection date';
-                rb.onclick = () => rebookFromCollection(c);
-                card.appendChild(rb);
-
-                const dm = document.createElement('button');
-                dm.className = 'collection-dismiss';
-                dm.textContent = 'Not happening — hide';
-                dm.onclick = () => dismissCollection(c);
-                card.appendChild(dm);
-            }
+        } else if (canHide) {
+            // Rebook: red = UPS didn't turn up, amber = customer wants a different day.
+            const rb = document.createElement('button');
+            rb.className = 'collection-rebook';
+            rb.textContent = k.cls === 'missed' ? 'Rebook this collection' : 'Change collection date';
+            rb.onclick = () => rebookFromCollection(c);
+            card.appendChild(rb);
         }
-        listEl.appendChild(card);
+
+        wrapper.appendChild(card);
+        if (canHide) {
+            card.classList.add('swipeable');
+            attachSwipeToHide(card, bg, c);
+        }
+        listEl.appendChild(wrapper);
     });
 }
 
-// Hide a collection that was cancelled by phone but never cancelled at UPS.
-// It stays hidden unless UPS scans the box later, in which case it comes back
-// on its own — a scan is a fact, the cancellation was only what we were told.
-async function dismissCollection(c) {
-    const ok = await confirmDialog({
-        title: 'Hide this collection?',
-        message: `${c.customerName || 'This customer'} — ${c.jobNumbers.join(', ')}\n\nThis removes it from the pending list. Use it when a collection has been cancelled with the customer but not cancelled at UPS.\n\nIt'll reappear on its own if UPS scans the box after all.`,
-        okText: 'Hide it',
-        cancelText: 'Cancel'
-    });
-    if (!ok) return;
+// Swipe-left-to-hide. Uses pointer events so it works with a finger on the bench
+// tablet and with a mouse drag on a desktop.
+// Horizontal vs vertical intent is decided on the first few pixels of movement, so
+// scrolling the list down doesn't drag cards sideways by accident.
+function attachSwipeToHide(card, bg, c) {
+    const THRESHOLD = 90;   // px before a swipe counts as "hide it"
+    let startX = 0, startY = 0, dx = 0;
+    let active = false, decided = false, horizontal = false;
 
+    const reset = () => {
+        card.style.transition = 'transform 0.2s ease';
+        card.style.transform = 'translateX(0)';
+        bg.style.opacity = 0;
+    };
+
+    card.addEventListener('pointerdown', (e) => {
+        // Let buttons be buttons
+        if (e.target.closest('button')) return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        active = true; decided = false; horizontal = false; dx = 0;
+        startX = e.clientX; startY = e.clientY;
+        card.style.transition = 'none';
+    });
+
+    card.addEventListener('pointermove', (e) => {
+        if (!active) return;
+        const mx = e.clientX - startX;
+        const my = e.clientY - startY;
+
+        if (!decided) {
+            if (Math.abs(mx) < 6 && Math.abs(my) < 6) return;  // too small to judge yet
+            decided = true;
+            horizontal = Math.abs(mx) > Math.abs(my);
+            if (horizontal) {
+                try { card.setPointerCapture(e.pointerId); } catch (_) {}
+            } else {
+                active = false;   // vertical — hand it back to the scroller
+                reset();
+                return;
+            }
+        }
+        if (!horizontal) return;
+
+        dx = Math.min(0, mx);   // left only
+        card.style.transform = 'translateX(' + dx + 'px)';
+        bg.style.opacity = Math.min(1, Math.abs(dx) / THRESHOLD);
+    });
+
+    const finish = () => {
+        if (!active) return;
+        active = false;
+        if (horizontal && dx < -THRESHOLD) {
+            card.style.transition = 'transform 0.18s ease-in';
+            card.style.transform = 'translateX(-110%)';
+            setTimeout(() => hideCollection(c), 170);
+        } else {
+            reset();
+        }
+        horizontal = false; dx = 0;
+    };
+
+    card.addEventListener('pointerup', finish);
+    card.addEventListener('pointercancel', finish);
+    card.addEventListener('pointerleave', (e) => { if (active && !horizontal) { active = false; reset(); } });
+}
+
+// Hide a collection that was cancelled by phone but never cancelled at UPS.
+// No confirmation — the swipe itself is the deliberate act, and the "Show hidden"
+// bar is the undo. It also comes back on its own if UPS scans the box later:
+// a scan is a fact, the cancellation was only what we were told.
+async function hideCollection(c) {
     try {
         const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
             method: 'POST',
@@ -2595,10 +2668,11 @@ async function dismissCollection(c) {
         }, 30000);
         const result = await res.json();
         if (!result.success) throw new Error(result.error || 'Could not hide it');
-        showToast('Collection hidden', 'success');
+        showToast('Hidden — use "Show hidden" at the top to undo', 'success', 5000);
         loadCollections(false);
     } catch (err) {
         showToast('Could not hide collection: ' + err.message, 'error', 6000);
+        loadCollections(false);   // card slid off screen; redraw so it isn't lost visually
     }
 }
 
