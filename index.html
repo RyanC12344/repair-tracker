@@ -221,6 +221,25 @@ textarea { resize: vertical; min-height: 80px; }
 .confirm-btn-ok.dangerous:hover { background: #a01729; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes confirmIn { from { transform: translateY(-12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ============ PENDING COLLECTIONS ============ */
+.collections-btn { display:block; width:100%; padding:16px; background:linear-gradient(135deg,#1a2332 0%,#2d3e50 100%); color:white; border:3px solid #17a2b8; border-radius:10px; font-size:17px; font-weight:700; cursor:pointer; transition:all 0.3s; letter-spacing:0.5px; }
+.collections-btn:hover { background:#17a2b8; transform:translateY(-2px); }
+.collection-card { background:#f8f9fa; padding:16px 18px; border-radius:8px; border:2px solid #e0e0e0; border-left:7px solid #6c757d; margin-bottom:12px; }
+.collection-card.missed    { border-color:#f5c6cb; border-left-color:#dc3545; background:#f8d7da; }
+.collection-card.awaiting  { border-color:#ffeeba; border-left-color:#ffc107; background:#fff3cd; }
+.collection-card.collected { border-color:#c3e6cb; border-left-color:#28a745; background:#d4edda; }
+.collection-card.delivered { border-color:#bee5eb; border-left-color:#17a2b8; background:#d1ecf1; }
+.collection-status { font-weight:700; font-size:16px; margin-bottom:6px; }
+.collection-name { font-size:17px; font-weight:700; color:#1a2332; }
+.collection-meta { font-size:14px; color:#555; margin-top:4px; line-height:1.5; }
+.collection-track { font-family:'Courier New',monospace; font-size:13px; color:#666; margin-top:6px; }
+.collection-rebook { margin-top:10px; padding:9px 16px; background:#c41e3a; color:white; border:none; border-radius:6px; font-weight:700; font-size:14px; cursor:pointer; }
+.collection-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+.collection-summary div { padding:16px; border-radius:10px; text-align:center; color:white; }
+.cs-missed { background:#dc3545; } .cs-awaiting { background:#e0a800; } .cs-collected { background:#28a745; }
+.collection-summary .n { font-size:30px; font-weight:700; }
+.collection-summary .l { font-size:12px; text-transform:uppercase; letter-spacing:0.5px; opacity:0.92; }
 </style>
 </head>
 <body>
@@ -237,6 +256,9 @@ textarea { resize: vertical; min-height: 80px; }
             <button class="new-booking-btn" onclick="openBookingPortal()" style="flex:2;">+ New Booking</button>
             <button class="rebook-btn" onclick="openRebookModal()" style="flex:1;">Rebook Pickup</button>
             <button class="resend-btn" onclick="openResendPortal()" style="flex:1;">Resend Label</button>
+        </div>
+        <div style="margin-bottom:15px;">
+            <button class="collections-btn" onclick="openCollectionsPortal()">📦 Pending Collections</button>
         </div>
 
         <h2 class="section-title">Select a Job to Begin Repair</h2>
@@ -466,6 +488,30 @@ textarea { resize: vertical; min-height: 80px; }
                     <button type="button" onclick="lookupJobForResend()">Find Job</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- ===================== PENDING COLLECTIONS ===================== -->
+    <div id="collectionsPortal" class="hidden">
+        <div class="booking-header">
+            <button class="back-to-jobs-btn" onclick="closeCollectionsPortal()"><span style="font-size:18px;">←</span> Back</button>
+            <div><span class="booking-job-label">UPS Collections</span><span class="booking-job-number">Awaiting Arrival</span></div>
+        </div>
+        <div class="form-section">
+            <div class="section-title">Pending Collections</div>
+            <p style="color:#666;margin-bottom:18px;font-size:14px;">Every booked collection that hasn't been booked in on the bench yet. Status comes from the UPS origin scan — green means a driver physically took the box.</p>
+            <div id="collectionsError" class="error-message hidden"></div>
+            <div class="collection-summary">
+                <div class="cs-missed"><div class="n" id="csMissed">0</div><div class="l">Not Collected</div></div>
+                <div class="cs-awaiting"><div class="n" id="csAwaiting">0</div><div class="l">Awaiting</div></div>
+                <div class="cs-collected"><div class="n" id="csCollected">0</div><div class="l">Collected</div></div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;">
+                <button id="collectionsRefreshBtn" onclick="loadCollections(true)" style="padding:11px 20px;background:#1a2332;color:white;border:none;border-radius:6px;font-weight:600;cursor:pointer;">↻ Check UPS Now</button>
+                <span id="collectionsChecked" style="font-size:13px;color:#888;"></span>
+            </div>
+            <div class="loading" id="collectionsLoading">Loading collections...</div>
+            <div id="collectionsList"></div>
         </div>
     </div>
 
@@ -2327,6 +2373,150 @@ document.addEventListener('keydown', function(e) {
         if (modal && !modal.classList.contains('hidden')) closeEmailModal();
     }
 });
+
+// ============ PENDING COLLECTIONS ============
+// Shows every booked collection that hasn't landed on the bench yet, colour-coded
+// by whether UPS has actually scanned the box at origin.
+//   green  = collected (a real scan exists)
+//   red    = collection date has passed with no scan — UPS didn't turn up
+//   amber  = collection due today or later, nothing yet — normal
+//   blue   = delivered to us but not booked in on the bench
+let collectionsData = [];
+
+function openCollectionsPortal() {
+    document.getElementById('jobSelector').classList.add('hidden');
+    document.getElementById('collectionsPortal').classList.remove('hidden');
+    document.getElementById('collectionsError').classList.add('hidden');
+    window.scrollTo(0, 0);
+    loadCollections(false);
+}
+
+function closeCollectionsPortal() {
+    document.getElementById('collectionsPortal').classList.add('hidden');
+    document.getElementById('jobSelector').classList.remove('hidden');
+}
+
+// Decide the colour band. UPS gives us the scan state; the pickup date turns
+// "no scan yet" into either "fine, not due" or "they didn't come".
+function classifyCollection(c) {
+    if (c.state === 'DELIVERED') return { cls: 'delivered', label: '📥 Delivered — not booked in yet', rank: 2 };
+    if (c.state === 'COLLECTED') return { cls: 'collected', label: '✓ Collected' + (c.collectedAt ? ' — ' + c.collectedAt : ''), rank: 3 };
+    if (c.state === 'ERROR')     return { cls: '', label: '⚠ Could not reach UPS' + (c.note ? ' (' + c.note + ')' : ''), rank: 1 };
+
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (c.pickupDateISO) {
+        const pd = new Date(c.pickupDateISO + 'T00:00:00');
+        if (pd < today) return { cls: 'missed', label: '✗ NOT COLLECTED', rank: 0 };
+    }
+    return { cls: 'awaiting', label: '⏳ Awaiting collection', rank: 1 };
+}
+
+async function loadCollections(force) {
+    const listEl = document.getElementById('collectionsList');
+    const loadEl = document.getElementById('collectionsLoading');
+    const errEl  = document.getElementById('collectionsError');
+    const btn    = document.getElementById('collectionsRefreshBtn');
+
+    errEl.classList.add('hidden');
+    listEl.innerHTML = '';
+    loadEl.classList.remove('hidden');
+    loadEl.textContent = force ? 'Checking every tracking number with UPS…' : 'Loading collections…';
+    if (force) setButtonLoading(btn, true, 'Checking…');
+
+    try {
+        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'getCollections', force: !!force })
+        }, 180000);
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Failed to load collections');
+
+        collectionsData = result.collections || [];
+        renderCollections();
+        const when = result.checkedAt ? new Date(result.checkedAt) : new Date();
+        document.getElementById('collectionsChecked').textContent =
+            'Last checked ' + when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) +
+            (result.apiCalls ? ' — ' + result.apiCalls + ' looked up live' : ' — from cache');
+    } catch (err) {
+        errEl.textContent = 'Error loading collections: ' + err.message;
+        errEl.classList.remove('hidden');
+        showToast('Could not load collections: ' + err.message, 'error', 6000);
+    } finally {
+        loadEl.classList.add('hidden');
+        setButtonLoading(btn, false);
+    }
+}
+
+function renderCollections() {
+    const listEl = document.getElementById('collectionsList');
+    listEl.innerHTML = '';
+
+    let missed = 0, awaiting = 0, collected = 0;
+    const decorated = collectionsData.map(c => {
+        const k = classifyCollection(c);
+        if (k.cls === 'missed') missed++;
+        else if (k.cls === 'awaiting') awaiting++;
+        else if (k.cls === 'collected' || k.cls === 'delivered') collected++;
+        return { c, k };
+    });
+
+    document.getElementById('csMissed').textContent = missed;
+    document.getElementById('csAwaiting').textContent = awaiting;
+    document.getElementById('csCollected').textContent = collected;
+
+    // Problems first, then by pickup date oldest-first
+    decorated.sort((a, b) => {
+        if (a.k.rank !== b.k.rank) return a.k.rank - b.k.rank;
+        return (a.c.pickupDateISO || '9999').localeCompare(b.c.pickupDateISO || '9999');
+    });
+
+    if (!decorated.length) {
+        listEl.innerHTML = '<p style="text-align:center;color:#666;padding:20px;">No outstanding collections. Everything booked has been received.</p>';
+        return;
+    }
+
+    decorated.forEach(({ c, k }) => {
+        const card = document.createElement('div');
+        card.className = 'collection-card ' + k.cls;
+
+        const jobs = c.jobNumbers.join(', ');
+        const addr = [c.customerAddress, c.postcode].filter(Boolean).join(', ');
+        const dateText = c.pickupDate
+            ? (c.pickupDateKnown ? c.pickupDate : c.pickupDate + ' (approx)')
+            : 'unknown';
+        const scanLine = c.lastScan
+            ? `<div class="collection-meta">Last UPS scan: ${c.lastScan}${c.lastScanAt ? ' — ' + c.lastScanAt : ''}</div>`
+            : '';
+
+        card.innerHTML = `
+            <div class="collection-status">${k.label}</div>
+            <div class="collection-name">${c.customerName || '(no name)'}</div>
+            <div class="collection-meta">${addr || '(no address)'}</div>
+            <div class="collection-meta"><strong>${jobs}</strong> &nbsp;•&nbsp; Collection booked: ${dateText}</div>
+            ${scanLine}
+            <div class="collection-track">${c.trackingNumber}</div>
+        `;
+
+        if (k.cls === 'missed') {
+            const rb = document.createElement('button');
+            rb.className = 'collection-rebook';
+            rb.textContent = 'Rebook this collection';
+            rb.onclick = () => rebookFromCollection(c);
+            card.appendChild(rb);
+        }
+        listEl.appendChild(card);
+    });
+}
+
+// Jump straight into the existing rebook flow with the job number filled in.
+function rebookFromCollection(c) {
+    const baseJob = (c.jobNumbers[0] || '').split('#')[0].trim();
+    closeCollectionsPortal();
+    openRebookModal();
+    document.getElementById('rbJobNumber').value = baseJob;
+    lookupJobForRebook();
+}
 
 // ============ INIT ============
 loadBookingState();
