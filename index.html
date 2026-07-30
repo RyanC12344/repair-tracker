@@ -235,11 +235,11 @@ textarea { resize: vertical; min-height: 80px; }
 .collection-meta { font-size:14px; color:#555; margin-top:4px; line-height:1.5; }
 .collection-track { font-family:'Courier New',monospace; font-size:13px; color:#666; margin-top:6px; }
 .collection-rebook { margin-top:10px; padding:9px 16px; background:#c41e3a; color:white; border:none; border-radius:6px; font-weight:700; font-size:14px; cursor:pointer; }
-.collection-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
-.collection-summary div { padding:16px; border-radius:10px; text-align:center; color:white; }
+.collection-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+.collection-summary div { padding:8px 6px; border-radius:8px; text-align:center; color:white; }
 .cs-missed { background:#dc3545; } .cs-awaiting { background:#e0a800; } .cs-collected { background:#28a745; }
-.collection-summary .n { font-size:30px; font-weight:700; }
-.collection-summary .l { font-size:12px; text-transform:uppercase; letter-spacing:0.5px; opacity:0.92; }
+.collection-summary .n { font-size:20px; font-weight:700; line-height:1.1; }
+.collection-summary .l { font-size:10px; text-transform:uppercase; letter-spacing:0.4px; opacity:0.92; }
 </style>
 </head>
 <body>
@@ -2170,7 +2170,12 @@ async function sendModalEmail() {
 }
 
 // ============ REBOOK PICKUP ============
+// Set when the rebook screen was opened from Pending Collections, so Back and a
+// successful rebook return there instead of dumping you on the job list.
+let rebookReturnToCollections = false;
+
 function openRebookModal() {
+    rebookReturnToCollections = false;
     document.getElementById('jobSelector').classList.add('hidden');
     document.getElementById('rebookPortal').classList.remove('hidden');
     document.getElementById('rebookSuccess').classList.add('hidden');
@@ -2189,7 +2194,15 @@ function openRebookModal() {
     });
     window.scrollTo(0,0);
 }
-function closeRebookPortal() { document.getElementById('rebookPortal').classList.add('hidden'); document.getElementById('jobSelector').classList.remove('hidden'); }
+function closeRebookPortal() {
+    document.getElementById('rebookPortal').classList.add('hidden');
+    if (rebookReturnToCollections) {
+        rebookReturnToCollections = false;
+        openCollectionsPortal();   // re-reads collections so the new date shows
+    } else {
+        document.getElementById('jobSelector').classList.remove('hidden');
+    }
+}
 function selectRebookPackCount(el) {
     el.closest('.pack-count-row').querySelectorAll('.pack-count-btn').forEach(b=>b.classList.remove('selected'));
     el.classList.add('selected');
@@ -2498,10 +2511,13 @@ function renderCollections() {
             <div class="collection-track">${c.trackingNumber}</div>
         `;
 
-        if (k.cls === 'missed') {
+        // Rebook is offered wherever the collection hasn't happened yet: red (UPS
+        // didn't turn up) and amber (still due, but the customer wants a different
+        // day). Not on green — the pack is already with UPS.
+        if (k.cls === 'missed' || k.cls === 'awaiting' || k.cls === '') {
             const rb = document.createElement('button');
             rb.className = 'collection-rebook';
-            rb.textContent = 'Rebook this collection';
+            rb.textContent = k.cls === 'missed' ? 'Rebook this collection' : 'Change collection date';
             rb.onclick = () => rebookFromCollection(c);
             card.appendChild(rb);
         }
@@ -2510,10 +2526,12 @@ function renderCollections() {
 }
 
 // Jump straight into the existing rebook flow with the job number filled in.
+// openRebookModal() clears the return flag, so set it afterwards.
 function rebookFromCollection(c) {
     const baseJob = (c.jobNumbers[0] || '').split('#')[0].trim();
     closeCollectionsPortal();
     openRebookModal();
+    rebookReturnToCollections = true;
     document.getElementById('rbJobNumber').value = baseJob;
     lookupJobForRebook();
 }
