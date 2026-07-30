@@ -2408,6 +2408,48 @@ document.addEventListener('keydown', function(e) {
 let collectionsData = [];
 let showDismissed = false;      // whether hidden collections are currently listed
 let dismissedCount = 0;
+let collectionsLoadedAt = 0;    // when the list was last fetched, ms
+const COLLECTIONS_CACHE_KEY = 'collectionsCache';
+const COLLECTIONS_FRESH_MS = 15 * 60 * 1000;   // reopen within this window uses the cache
+
+// Apps Script answers a POST with a 302; if the script runs long the redirect lands
+// back on doGet and we get "Repair tracker endpoint is running." instead of JSON.
+// Turn that into a message that says what actually happened.
+async function parseServerJSON(res) {
+    const text = await res.text();
+    try {
+        return JSON.parse(text);
+    } catch (_) {
+        if (text.indexOf('Repair tracker endpoint') >= 0) {
+            throw new Error('the server took too long and gave up. Try "Check UPS Now" again — each attempt checks a few more and saves them.');
+        }
+        throw new Error('unexpected reply from the server: ' + text.substring(0, 80));
+    }
+}
+
+function saveCollectionsCache() {
+    try {
+        sessionStorage.setItem(COLLECTIONS_CACHE_KEY, JSON.stringify({
+            collections: collectionsData,
+            dismissedCount: dismissedCount,
+            loadedAt: collectionsLoadedAt
+        }));
+    } catch (e) { console.warn('Could not cache collections:', e); }
+}
+
+function loadCollectionsCache() {
+    try {
+        const raw = sessionStorage.getItem(COLLECTIONS_CACHE_KEY);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.collections)) return false;
+        if (Date.now() - (parsed.loadedAt || 0) > COLLECTIONS_FRESH_MS) return false;
+        collectionsData = parsed.collections;
+        dismissedCount = parsed.dismissedCount || 0;
+        collectionsLoadedAt = parsed.loadedAt || 0;
+        return true;
+    } catch (e) { return false; }
+}
 
 function openCollectionsPortal() {
     document.getElementById('jobSelector').classList.add('hidden');
@@ -2415,7 +2457,27 @@ function openCollectionsPortal() {
     document.getElementById('collectionsError').classList.add('hidden');
     showDismissed = false;
     window.scrollTo(0, 0);
-    loadCollections(false);
+
+    // Reopening within the freshness window draws straight from the cache — no
+    // waiting, no UPS calls. "Check UPS Now" forces a real refresh whenever wanted.
+    if (loadCollectionsCache()) {
+        document.getElementById('collectionsLoading').classList.add('hidden');
+        renderCollections();
+        stampCollectionsChecked(collectionsLoadedAt, 0, 0, true);
+    } else {
+        loadCollections(false);
+    }
+}
+
+// The "last checked" line under the refresh button.
+function stampCollectionsChecked(whenMs, apiCalls, skipped, fromCache) {
+    const when = whenMs ? new Date(whenMs) : new Date();
+    let txt = 'Last checked ' + when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (fromCache) txt += ' — showing saved results';
+    else if (apiCalls) txt += ' — ' + apiCalls + ' looked up live';
+    else txt += ' — from cache';
+    if (skipped) txt += ', ' + skipped + ' not checked yet';
+    document.getElementById('collectionsChecked').textContent = txt;
 }
 
 function closeCollectionsPortal() {
@@ -2426,6 +2488,7 @@ function closeCollectionsPortal() {
 // Decide the colour band. UPS gives us the scan state; the pickup date turns
 // "no scan yet" into either "fine, not due" or "they didn't come".
 function classifyCollection(c) {
+    if (c.state === 'NOT_CHECKED') return { cls: '', label: '… not checked with UPS yet', rank: 1 };
     if (c.state === 'DELIVERED') return { cls: 'delivered', label: '📥 Delivered — not booked in yet', rank: 2 };
     if (c.state === 'COLLECTED') return { cls: 'collected', label: '✓ Collected' + (c.collectedAt ? ' — ' + c.collectedAt : ''), rank: 3 };
     if (c.state === 'ERROR')     return { cls: '', label: '⚠ Could not reach UPS' + (c.note ? ' (' + c.note + ')' : ''), rank: 1 };
@@ -2456,20 +2519,24 @@ async function loadCollections(force) {
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ action: 'getCollections', force: !!force, includeDismissed: showDismissed })
         }, 180000);
-        const result = await res.json();
+        const result = await parseServerJSON(res);
         if (!result.success) throw new Error(result.error || 'Failed to load collections');
 
         collectionsData = result.collections || [];
         dismissedCount = result.dismissedCount || 0;
+        collectionsLoadedAt = result.checkedAt || Date.now();
         renderCollections();
-        const when = result.checkedAt ? new Date(result.checkedAt) : new Date();
-        document.getElementById('collectionsChecked').textContent =
-            'Last checked ' + when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) +
-            (result.apiCalls ? ' — ' + result.apiCalls + ' looked up live' : ' — from cache');
+        saveCollectionsCache();
+        stampCollectionsChecked(collectionsLoadedAt, result.apiCalls, result.skipped, false);
+        if (result.skipped) {
+            showToast(result.skipped + ' not checked yet — press "Check UPS Now" again to continue', 'info', 5000);
+        }
     } catch (err) {
         errEl.textContent = 'Error loading collections: ' + err.message;
         errEl.classList.remove('hidden');
-        showToast('Could not load collections: ' + err.message, 'error', 6000);
+        showToast('Could not load collections: ' + err.message, 'error', 7000);
+        // Fall back to whatever was cached so the screen isn't left empty
+        if (!collectionsData.length && loadCollectionsCache()) renderCollections();
     } finally {
         loadEl.classList.add('hidden');
         setButtonLoading(btn, false);
@@ -2547,18 +2614,20 @@ function renderCollections() {
             : '';
         const statusLabel = c.dismissed ? '🚫 Hidden — not happening' : k.label;
 
-        // Swipe applies where the collection hasn't happened yet. Hiding a pack that
-        // UPS has already scanned would make no sense.
-        const canHide = !c.dismissed && (k.cls === 'missed' || k.cls === 'awaiting' || k.cls === '');
+        // Anything still on the list can be swiped away, including collected ones —
+        // clearing a pack you've dealt with is as valid as clearing a cancellation.
+        const canHide = !c.dismissed;
+        // Rebook only makes sense while the box is still with the customer.
+        const canRebook = !c.dismissed && (k.cls === 'missed' || k.cls === 'awaiting' || k.cls === '');
 
         card.innerHTML = `
-            <div class="collection-status">${statusLabel}</div>
+            <div class="collection-status">${statusLabel}${c.stale ? ' <span style="font-weight:400;font-size:13px;opacity:0.7;">(status may be out of date)</span>' : ''}</div>
             <div class="collection-name">${c.customerName || '(no name)'}</div>
             <div class="collection-meta">${addr || '(no address)'}</div>
             <div class="collection-meta"><strong>${jobs}</strong> &nbsp;•&nbsp; Collection booked: ${dateText}</div>
             ${scanLine}
             <div class="collection-track">${c.trackingNumber}</div>
-            ${canHide ? '<div class="swipe-hint">Swipe left to hide if this collection isn\'t happening</div>' : ''}
+            ${canHide ? '<div class="swipe-hint">Swipe left to remove from this list</div>' : ''}
         `;
 
         if (c.dismissed) {
@@ -2567,7 +2636,7 @@ function renderCollections() {
             rs.textContent = 'Put back on the list';
             rs.onclick = () => restoreCollection(c);
             card.appendChild(rs);
-        } else if (canHide) {
+        } else if (canRebook) {
             // Rebook: red = UPS didn't turn up, amber = customer wants a different day.
             const rb = document.createElement('button');
             rb.className = 'collection-rebook';
@@ -2651,11 +2720,17 @@ function attachSwipeToHide(card, bg, c) {
     card.addEventListener('pointerleave', (e) => { if (active && !horizontal) { active = false; reset(); } });
 }
 
-// Hide a collection that was cancelled by phone but never cancelled at UPS.
-// No confirmation — the swipe itself is the deliberate act, and the "Show hidden"
-// bar is the undo. It also comes back on its own if UPS scans the box later:
-// a scan is a fact, the cancellation was only what we were told.
+// Hide a collection. The card is removed locally rather than reloading the whole
+// list — a reload means another round of UPS lookups and leaves you staring at a
+// spinner after every swipe. The server call happens in the background; if it
+// fails the card is put back.
 async function hideCollection(c) {
+    const idx = collectionsData.findIndex(x => x.trackingNumber === c.trackingNumber);
+    const removed = idx >= 0 ? collectionsData.splice(idx, 1)[0] : null;
+    dismissedCount++;
+    renderCollections();
+    saveCollectionsCache();
+
     try {
         const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
             method: 'POST',
@@ -2663,20 +2738,30 @@ async function hideCollection(c) {
             body: JSON.stringify({
                 action: 'dismissCollection',
                 trackingNumber: c.trackingNumber,
-                jobNumbers: c.jobNumbers
+                jobNumbers: c.jobNumbers,
+                state: c.state
             })
         }, 30000);
-        const result = await res.json();
+        const result = await parseServerJSON(res);
         if (!result.success) throw new Error(result.error || 'Could not hide it');
-        showToast('Hidden — use "Show hidden" at the top to undo', 'success', 5000);
-        loadCollections(false);
+        showToast('Hidden — use "Show hidden" at the top to undo', 'success', 4000);
     } catch (err) {
+        // Put it back; the server never recorded it
+        if (removed) collectionsData.splice(idx, 0, removed);
+        dismissedCount = Math.max(0, dismissedCount - 1);
+        renderCollections();
+        saveCollectionsCache();
         showToast('Could not hide collection: ' + err.message, 'error', 6000);
-        loadCollections(false);   // card slid off screen; redraw so it isn't lost visually
     }
 }
 
 async function restoreCollection(c) {
+    const target = collectionsData.find(x => x.trackingNumber === c.trackingNumber);
+    if (target) target.dismissed = false;
+    dismissedCount = Math.max(0, dismissedCount - 1);
+    renderCollections();
+    saveCollectionsCache();
+
     try {
         const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
             method: 'POST',
@@ -2686,11 +2771,14 @@ async function restoreCollection(c) {
                 trackingNumber: c.trackingNumber
             })
         }, 30000);
-        const result = await res.json();
+        const result = await parseServerJSON(res);
         if (!result.success) throw new Error(result.error || 'Could not restore it');
         showToast('Back on the list', 'success');
-        loadCollections(false);
     } catch (err) {
+        if (target) target.dismissed = true;
+        dismissedCount++;
+        renderCollections();
+        saveCollectionsCache();
         showToast('Could not restore collection: ' + err.message, 'error', 6000);
     }
 }
