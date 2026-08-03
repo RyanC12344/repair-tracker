@@ -229,7 +229,6 @@ textarea { resize: vertical; min-height: 80px; }
 .collection-card.missed    { border-color:#f5c6cb; border-left-color:#dc3545; background:#f8d7da; }
 .collection-card.awaiting  { border-color:#ffeeba; border-left-color:#ffc107; background:#fff3cd; }
 .collection-card.collected { border-color:#c3e6cb; border-left-color:#28a745; background:#d4edda; }
-.collection-card.delivered { border-color:#bee5eb; border-left-color:#17a2b8; background:#d1ecf1; }
 .collection-status { font-weight:700; font-size:16px; margin-bottom:6px; }
 .collection-name { font-size:17px; font-weight:700; color:#1a2332; }
 .collection-meta { font-size:14px; color:#555; margin-top:4px; line-height:1.5; }
@@ -414,7 +413,7 @@ textarea { resize: vertical; min-height: 80px; }
             <div class="validation-msg" id="bookingValidation">Please fill in all required fields: name, street address, town/city, postcode, phone, a valid email address, and pickup date.</div>
 
             <div class="navigation-buttons">
-                <button type="button" class="btn btn-submit" onclick="submitBookingAndUPS()" id="bookingSubmitBtn">Book Repair, Generate Label & Schedule Pickup</button>
+                <button type="button" class="btn btn-submit" onclick="submitBookingAndUPS()" id="bookingSubmitBtn">Book Repair, Generate Label &amp; Schedule Pickup</button>
             </div>
 
             <!-- UPS results (shown after successful booking) -->
@@ -509,7 +508,7 @@ textarea { resize: vertical; min-height: 80px; }
         </div>
         <div class="form-section">
             <div class="section-title">Pending Collections</div>
-            <p style="color:#666;margin-bottom:18px;font-size:14px;">Every booked collection that hasn't been booked in on the bench yet. Status comes from the UPS origin scan — green means a driver physically took the box.</p>
+            <p style="color:#666;margin-bottom:18px;font-size:14px;">Every booked collection still out with a customer. Status comes from the UPS origin scan — green means a driver physically took the box. Once UPS delivers it here, it drops off the list.</p>
             <div id="collectionsError" class="error-message hidden"></div>
             <div class="collection-summary">
                 <div class="cs-missed"><div class="n" id="csMissed">0</div><div class="l">Not Collected</div></div>
@@ -774,6 +773,14 @@ const SERVICE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxZEMgdG1vfq
 const API_SECRET = '87e6a7c137dc17b2978c2ff4f5af87cb98ab33be34066de8';
 // Note: Ideal Postcodes API key is stored in Apps Script Script Properties, not here.
 
+// Build marker. GitHub Pages sometimes serves a stale build, and "works on the PC
+// but not the tablet" is almost always two devices holding different builds rather
+// than a real backend fault. Open the console on any device and this tells you
+// immediately which frontend that device is actually running.
+const APP_VERSION = '2026-08-03b — postToScript hardening + delivered packs drop off Collections';
+console.log('%cRepair Tracker frontend build: ' + APP_VERSION, 'font-weight:bold;color:#c41e3a;');
+function showFrontendVersion() { showToast('Frontend build: ' + APP_VERSION, 'info', 8000); return APP_VERSION; }
+
 const MONTH_GIDS = { 1:null, 2:null, 3:null, 4:21700818, 5:257806692, 6:199519344, 7:0, 8:2124425478, 9:782015307, 10:1786550392, 11:330568521, 12:1114698946 };
 const MONTH_NAMES = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
 function getCurrentMonthGid() { return MONTH_GIDS[new Date().getMonth() + 1]; }
@@ -819,6 +826,158 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 45000) {
             throw new Error(`Request timed out after ${Math.round(timeoutMs/1000)}s. Please check your connection and try again.`);
         }
         throw err;
+    }
+}
+
+// ============ SERVER CALL HELPER ============
+// Every call to Apps Script goes through postToScript(). It exists because
+// `await res.json()` is not safe against the two ways this backend fails:
+//
+//   1. Apps Script answers a POST with a 302 to googleusercontent. If the script
+//      runs long, that redirect lands on doGet() and the browser receives
+//      "Repair tracker endpoint is running." — plain text, not JSON. res.json()
+//      then throws "Unexpected token 'R'", which tells you nothing about what
+//      actually went wrong.
+//   2. A transient Google hiccup or an expired web-app authorisation returns an
+//      HTML page. res.json() throws "Unexpected token '<'".
+//
+// Both look identical to the user: a raw JSON error, seemingly at random, which
+// clears when you try again on a different device. That's not a device problem —
+// it's timing.
+//
+// RETRY IS DELIBERATELY OPT-IN PER ACTION. Blanket retry would be dangerous here:
+// retrying 'generateLabel' creates a second real UPS shipment you get billed for;
+// retrying 'booking' duplicates a sheet row; retrying 'sendEmail' mails the
+// customer twice. Only genuinely repeatable actions are listed below.
+//
+// 'repair' is on the list because writeRepair() sets the same cells to the same
+// values every time, and its column E guard means a second run skips the date.
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Thrown when the server answered with something that isn't JSON, or didn't
+// answer at all. `mayHaveSucceeded` is the important bit: for a write action,
+// a lost reply does NOT mean the work didn't happen on the server.
+class ServerBusyError extends Error {
+    constructor(message, mayHaveSucceeded) {
+        super(message);
+        this.name = 'ServerBusyError';
+        this.mayHaveSucceeded = !!mayHaveSucceeded;
+    }
+}
+
+// Safe to run twice — no duplicated side effects.
+const RETRYABLE_ACTIONS = [
+    'lookupPostcode',
+    'lookupJob',
+    'getCollections',
+    'dismissCollection',
+    'restoreCollection',
+    'repair'
+];
+
+// Pure reads. A lost reply here changes nothing on the server, so there's no
+// "did it go through?" question to ask the user.
+const READ_ONLY_ACTIONS = ['lookupPostcode', 'lookupJob', 'getCollections'];
+
+// Turn whatever non-JSON thing came back into a sentence worth reading.
+function describeNonJSON(text) {
+    const t = String(text || '').trim();
+    if (!t) return 'the server sent an empty reply';
+    if (t.indexOf('Repair tracker endpoint') >= 0) {
+        return 'the server took too long and the request fell through to the status page';
+    }
+    if (/^\s*</.test(t) || t.indexOf('<!DOCTYPE') >= 0 || t.indexOf('<html') >= 0) {
+        if (/sign in|accounts\.google|ServiceLogin|Google Account/i.test(t)) {
+            return 'the server returned a Google sign-in page — the web app deployment may need re-authorising';
+        }
+        return 'the server returned a web page instead of data (usually a temporary Apps Script hiccup)';
+    }
+    return 'unexpected reply from the server: ' + t.substring(0, 120);
+}
+
+function isNetworkError(err) {
+    const m = String((err && err.message) || '');
+    return /Failed to fetch|NetworkError|timed out|Load failed|network/i.test(m);
+}
+
+// payload  — the object to POST (must include an `action`)
+// opts     — { timeoutMs, retry (force true/false), allowFailure }
+//            allowFailure: return the parsed body even when success===false,
+//            instead of throwing. Used where the caller wants to inspect it.
+async function postToScript(payload, opts) {
+    opts = opts || {};
+    const timeoutMs = opts.timeoutMs || 45000;
+    const action = (payload && payload.action) || '';
+    const canRetry = (opts.retry !== undefined)
+        ? !!opts.retry
+        : RETRYABLE_ACTIONS.indexOf(action) >= 0;
+    const isReadOnly = READ_ONLY_ACTIONS.indexOf(action) >= 0;
+    const attempts = canRetry ? 2 : 1;
+
+    let lastErr = null;
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+            const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify(payload)
+            }, timeoutMs);
+
+            const text = await res.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (_) {
+                // Log the real body — next time this happens you'll know exactly
+                // what came back instead of guessing from a parse error.
+                console.warn(
+                    'postToScript: non-JSON reply for "' + action + '" ' +
+                    '(attempt ' + attempt + ' of ' + attempts + ', HTTP ' + res.status + '):',
+                    text.slice(0, 400)
+                );
+                throw new ServerBusyError(describeNonJSON(text), !isReadOnly);
+            }
+
+            // The server ran and said no. That's a real answer, not a transport
+            // failure — never retry it, just surface the reason.
+            if (data.success === false && !opts.allowFailure) {
+                throw new Error(data.error || 'The server rejected the request.');
+            }
+            return data;
+
+        } catch (err) {
+            lastErr = err;
+            const transport = (err instanceof ServerBusyError) || isNetworkError(err);
+            if (attempt < attempts && transport) {
+                console.warn('postToScript: retrying "' + action + '" in 2s — ' + err.message);
+                await sleep(2000);
+                continue;
+            }
+            break;
+        }
+    }
+
+    if (lastErr instanceof ServerBusyError) throw lastErr;
+    if (isNetworkError(lastErr)) throw new ServerBusyError(lastErr.message, !isReadOnly);
+    throw lastErr;
+}
+
+// For write actions, a lost reply is genuinely ambiguous. Rather than silently
+// retrying (duplicate label, duplicate email) or silently failing (you assume it
+// didn't work when it did), say so plainly and tell the user what to check.
+async function reportAmbiguousFailure(err, whatHappened, whatToCheck) {
+    if (err && err.mayHaveSucceeded) {
+        await confirmDialog({
+            title: '⚠ Not sure whether that went through',
+            message: whatHappened + '\n\n' + whatToCheck +
+                     '\n\nDetails: ' + err.message,
+            okText: 'OK, I\'ll check',
+            cancelText: 'Dismiss'
+        });
+    } else {
+        showToast(whatHappened + ' — ' + err.message, 'error', 7000);
     }
 }
 
@@ -1180,12 +1339,24 @@ function getDateCategory(d) {
 
 let cachedRows = [];
 
+// Fetch a month tab as CSV. Guards against the sheet export returning an HTML
+// page (happens if sharing gets changed to restricted) — without this you get a
+// silent mess of garbage rows rather than a clear error.
+async function fetchMonthCSV(gid) {
+    const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`);
+    const text = (await res.text()).replace(/^\uFEFF/, '');
+    if (/^\s*</.test(text) || text.indexOf('<!DOCTYPE') >= 0) {
+        console.warn('fetchMonthCSV: sheet export returned HTML, not CSV (gid ' + gid + '):', text.slice(0, 300));
+        throw new Error('The spreadsheet did not return data. Check the sheet is still shared as "Anyone with the link can view".');
+    }
+    return text;
+}
+
 async function loadJobs() {
     try {
         const gid = getCurrentMonthGid(), month = getCurrentMonthName();
         if (gid===null) { document.getElementById('loadingJobs').innerHTML=`<div class="error-message">No GID for ${month}.</div>`; return; }
-        const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`);
-        const text = (await res.text()).replace(/^\uFEFF/, ''); // strip BOM if present
+        const text = await fetchMonthCSV(gid);
         const allRows = parseCSV(text); cachedRows = allRows; const rows = allRows.slice(1);
 
         // Also pull last month's tab so bookings from late last month still show up
@@ -1200,8 +1371,7 @@ async function loadJobs() {
             const currentMonth = new Date().getMonth() + 1; // 1-12
             const prevMonth = currentMonth - 1;
             if (prevMonth >= 1 && MONTH_GIDS[prevMonth] !== null && MONTH_GIDS[prevMonth] !== undefined) {
-                const prevRes = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${MONTH_GIDS[prevMonth]}`);
-                const prevText = (await prevRes.text()).replace(/^\uFEFF/, '');
+                const prevText = await fetchMonthCSV(MONTH_GIDS[prevMonth]);
                 const prevAllRows = parseCSV(prevText);
                 lastMonthRows = prevAllRows.slice(1);
             }
@@ -1261,7 +1431,11 @@ async function loadJobs() {
         showJobTab('current');
         generateNextJobNumber();
         updateCategoryCounts();
-    } catch(err) { console.error(err); document.getElementById('loadingJobs').innerHTML='<div class="error-message">Error loading jobs. Refresh the page.</div>'; }
+    } catch(err) {
+        console.error(err);
+        document.getElementById('loadingJobs').classList.remove('hidden');
+        document.getElementById('loadingJobs').innerHTML='<div class="error-message">Error loading jobs: ' + err.message + '</div>';
+    }
 }
 
 function generateNextJobNumber() {
@@ -1404,14 +1578,45 @@ function collectFormData() {
         panelSockets:getPF('panelSockets'), lightsState:getPF('lightsState'), parts
     };
 }
-function submitForm() {
-    if(!SERVICE_SCRIPT_URL){showToast('Apps Script URL not configured.', 'error');return;}
-    const data=collectFormData(); const btn=document.querySelector('.btn-submit');
+
+// The old version fired the request and showed "Repair record saved!" from the
+// .then() without ever looking at the response — so a server-side failure still
+// showed a green tick and the draft was deleted. Now the reply is actually
+// checked before anything is claimed.
+async function submitForm() {
+    if (!SERVICE_SCRIPT_URL) { showToast('Apps Script URL not configured.', 'error'); return; }
+    const data = collectFormData();
+    const btn = document.querySelector('#repairForm .btn-submit');
     saveDateCodeSuggestion(dateCodeValue.toUpperCase());
     setButtonLoading(btn, true, 'Saving...');
-    fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(data)})
-    .then(()=>{document.getElementById('successMessage').classList.remove('hidden');deleteDraft(data.jobNumber);window.scrollTo(0,0);showToast('Repair record saved!', 'success');setButtonLoading(btn, false);setTimeout(()=>{backToJobSelector();loadJobs();},1200);})
-    .catch(err=>{document.getElementById('errorMessage').textContent='Error: '+err.message;document.getElementById('errorMessage').classList.remove('hidden');setButtonLoading(btn, false);window.scrollTo(0,0);showToast('Error saving repair: ' + err.message, 'error', 6000);});
+
+    try {
+        // 'repair' is retryable — writeRepair sets the same cells to the same
+        // values, so a second attempt is harmless.
+        await postToScript(data);
+        document.getElementById('errorMessage').classList.add('hidden');
+        document.getElementById('successMessage').classList.remove('hidden');
+        deleteDraft(data.jobNumber);
+        window.scrollTo(0, 0);
+        showToast('Repair record saved!', 'success');
+        setButtonLoading(btn, false);
+        setTimeout(() => { backToJobSelector(); loadJobs(); }, 1200);
+    } catch (err) {
+        console.error('submitForm failed:', err);
+        setButtonLoading(btn, false);
+        window.scrollTo(0, 0);
+        // The draft is deliberately NOT deleted here — if the save didn't land,
+        // the bench must not lose the work.
+        if (err.mayHaveSucceeded) {
+            document.getElementById('errorMessage').textContent =
+                'Both attempts to save timed out. The record MAY already be in the sheet — check row for ' +
+                data.jobNumber + ' before re-submitting. Your work is still saved as a draft.';
+        } else {
+            document.getElementById('errorMessage').textContent = 'Error: ' + err.message + ' — your work is still saved as a draft.';
+        }
+        document.getElementById('errorMessage').classList.remove('hidden');
+        showToast('Repair not saved: ' + err.message, 'error', 7000);
+    }
 }
 
 // ============ DRAFTS ============
@@ -1501,7 +1706,7 @@ function openBookingPortal() {
     ['bkBusinessName','bkCustomerName','bkPostcode','bkAddress','bkCity','bkPostcodeFinal','bkPhone','bkEmail','bkFault'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('bkPickupDate').value='';
     document.getElementById('addressResults').classList.add('hidden');
-bookingPackCount=1;
+    bookingPackCount=1;
     boxConfig=[10];
     document.getElementById('packCountMoreRow').classList.add('hidden');
     document.getElementById('bkPackCountMore').value = 4;
@@ -1652,6 +1857,8 @@ async function appendEmailSuffix(suffix) {
 }
 
 // ============ POSTCODE LOOKUP (via Apps Script proxy) ============
+// Retryable: a postcode lookup is a pure read, so a lost reply costs nothing
+// and a single automatic retry makes the intermittent failures invisible.
 async function lookupPostcode() {
     const postcode = document.getElementById('bkPostcode').value.trim();
     if (!postcode) { showToast('Please enter a postcode.', 'warning'); return; }
@@ -1659,17 +1866,11 @@ async function lookupPostcode() {
     const btn = document.querySelector('.postcode-lookup button');
     setButtonLoading(btn, true, 'Finding...');
     try {
-        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'lookupPostcode', postcode: postcode })
-        }, 30000);
-        const data = await res.json();
+        const data = await postToScript(
+            { action: 'lookupPostcode', postcode: postcode },
+            { timeoutMs: 30000 }
+        );
 
-        if (!data.success) {
-            showToast('Lookup error: ' + (data.error || 'unknown') + '. Enter address manually.', 'error', 5000);
-            return;
-        }
         if (!data.found) {
             if (data.reason === 'postcode_not_found') showToast('Postcode not found.', 'warning');
             else showToast('No addresses found for that postcode.', 'warning');
@@ -1696,8 +1897,8 @@ async function lookupPostcode() {
         document.getElementById('addressResults').classList.remove('hidden');
         document.getElementById('bkPostcodeFinal').value = (data.addresses[0].postcode || postcode).toUpperCase();
     } catch (err) {
-        console.error(err);
-        showToast('Address lookup error: ' + err.message + '. Enter manually.', 'error', 5000);
+        console.error('lookupPostcode failed:', err);
+        showToast('Address lookup failed — ' + err.message + '. Enter the address manually.', 'error', 6000);
     } finally {
         setButtonLoading(btn, false);
     }
@@ -1774,14 +1975,20 @@ async function submitBookingAndUPS() {
         packCount:bookingPackCount, pickupDate:formatDateUK(pickupISO)
     };
 
-    try {
-        // Step 1: Save booking to sheet
-        setButtonLoading(btn, true, 'Saving booking...');
-        const bookRes=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(bookingData)});
-        const bookResult=await bookRes.json();
-        if(!bookResult.success) throw new Error(bookResult.error||'Booking save failed');
+    // Tracks how far we got, so an ambiguous failure can say something useful
+    // about what may or may not already exist on the server.
+    let stage = 'booking';
+    let labelsMade = 0;
 
-     // Step 2: Generate UPS label(s) — one per box
+    try {
+        // Step 1: Save booking to sheet.
+        // NOT retried — a second attempt would add duplicate rows.
+        setButtonLoading(btn, true, 'Saving booking...');
+        await postToScript(bookingData);
+
+        // Step 2: Generate UPS label(s) — one per box.
+        // NOT retried — every attempt creates a real, billable UPS shipment.
+        stage = 'labels';
         setButtonLoading(btn, true, 'Generating UPS label(s)...');
         const boxes = bookingPackCount > 1 ? boxConfig : [bookingPackCount * 10];
 
@@ -1807,18 +2014,18 @@ async function submitBookingAndUPS() {
                 weight: boxes[b], packCount: bookingPackCount,
                 boxIndex: b + 1, boxJobs: boxJobs[b]
             };
-            const labelRes=await fetchWithTimeout(SERVICE_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(labelData)}, 60000);
-            const labelResult=await labelRes.json();
-            if(!labelResult.success) throw new Error(labelResult.error||'Label generation failed for box '+(b+1));
+            const labelResult = await postToScript(labelData, { timeoutMs: 60000 });
             labelResults.push(labelResult);
+            labelsMade++;
         }
 
         // Step 3: Schedule pickup. If this fails we DON'T throw — labels and sheet row
         // are already saved with real tracking numbers, so we treat it as a partial
         // success: email can still go out, and you go to Rebook to schedule collection.
+        stage = 'pickup';
         setButtonLoading(btn, true, 'Scheduling pickup...');
         const pickupWindow = resolvePickupWindow('bk');
-       const pickupData = {
+        const pickupData = {
             action:'schedulePickup', jobNumber:nextJobNumber,
             customerName, customerAddress, customerCity, customerPostcode, customerPhone,
             packCount:bookingPackCount,
@@ -1831,18 +2038,12 @@ async function submitBookingAndUPS() {
         let pickupResult = null;
         let pickupError = null;
         try {
-            const pickupRes = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify(pickupData)
-            }, 60000);
-            pickupResult = await pickupRes.json();
-            if (!pickupResult.success) {
-                pickupError = pickupResult.error || 'Pickup scheduling failed';
-                pickupResult = null;
-            }
+            // NOT retried — a duplicate pickup booking confuses the driver.
+            pickupResult = await postToScript(pickupData, { timeoutMs: 60000 });
         } catch (err) {
-            pickupError = err.message;
+            pickupError = err.mayHaveSucceeded
+                ? err.message + ' (the pickup may in fact have been booked — check before rebooking)'
+                : err.message;
         }
 
         // Store results for email sending. When pickup failed, we still store booking+label
@@ -1859,7 +2060,7 @@ async function submitBookingAndUPS() {
         saveBookingState();
 
         const packText = bookingPackCount > 1 ? `(${bookingPackCount} packs: ${nextJobNumber} #1 to #${bookingPackCount})` : '';
-const trackingList = labelResults.map((r, i) => {
+        const trackingList = labelResults.map((r, i) => {
             const jobs = boxJobs[i] || [];
             const suffixes = jobs.map(j => j.includes('#') ? '#' + j.split('#')[1].trim() : '').filter(Boolean);
             const label = suffixes.length ? `Box ${i+1} (${suffixes.join(', ')})` : `Box ${i+1}`;
@@ -1886,8 +2087,8 @@ const trackingList = labelResults.map((r, i) => {
             document.getElementById('upsSuccessMsg').innerHTML = `
                 <div style="background:#fff3cd;border:2px solid #ffc107;color:#856404;padding:14px;border-radius:8px;margin-bottom:12px;font-size:15px;line-height:1.5;">
                     <strong>⚠ Pickup was NOT scheduled</strong><br>
-                    Labels were generated successfully, but UPS rejected the pickup request.<br>
-                    <strong>You must go to the Rebook Pickup page and schedule the collection for ${nextJobNumber} separately.</strong><br>
+                    Labels were generated successfully, but the pickup request did not complete.<br>
+                    <strong>Go to the Rebook Pickup page and schedule the collection for ${nextJobNumber} separately.</strong><br>
                     <span style="font-size:13px;opacity:0.85;">Error: ${pickupError}</span>
                 </div>
                 ✓ Booking saved ${packText}<br>
@@ -1903,7 +2104,7 @@ const trackingList = labelResults.map((r, i) => {
             // Also show a proper modal dialog so the message isn't missed
             confirmDialog({
                 title: '⚠ Pickup Scheduling Failed',
-                message: `Labels are ready and the booking is saved, but UPS rejected the pickup request.\n\nYou must schedule the collection separately using the "Rebook Pickup" page.\n\nJob: ${nextJobNumber}\nError: ${pickupError}`,
+                message: `Labels are ready and the booking is saved, but the pickup request did not complete.\n\nSchedule the collection separately using the "Rebook Pickup" page.\n\nJob: ${nextJobNumber}\nError: ${pickupError}`,
                 okText: 'OK, I\'ll rebook',
                 cancelText: 'Cancel'
             });
@@ -1913,12 +2114,28 @@ const trackingList = labelResults.map((r, i) => {
     } catch(err) {
         // Only Step 1 or Step 2 failures reach here (booking save or label gen).
         // Pickup failures are handled above and do NOT throw.
-        console.error(err);
-        document.getElementById('bookingError').textContent='Error: '+err.message;
-        document.getElementById('bookingError').classList.remove('hidden');
+        console.error('submitBookingAndUPS failed at stage "' + stage + '":', err);
         setButtonLoading(btn, false);
-        showToast('Booking failed: ' + err.message, 'error', 6000);
         window.scrollTo(0,0);
+
+        if (err.mayHaveSucceeded) {
+            // This is the case that matters: the reply was lost, so we genuinely
+            // don't know what landed. Retrying blind could duplicate a sheet row
+            // or create a second billable UPS shipment.
+            const what = stage === 'booking'
+                ? `The booking for ${nextJobNumber} was sent but the server never confirmed.`
+                : `Label ${labelsMade + 1} for ${nextJobNumber} was sent but the server never confirmed. ${labelsMade} label(s) were confirmed before that.`;
+            const check = stage === 'booking'
+                ? `Check the sheet for ${nextJobNumber} before booking again — a blind retry could create duplicate rows.`
+                : `Check the "Repair Tracker Labels" folder in Drive and column B of the sheet before retrying — a blind retry creates a second billable UPS shipment.`;
+            document.getElementById('bookingError').textContent = what + ' ' + check;
+            document.getElementById('bookingError').classList.remove('hidden');
+            await reportAmbiguousFailure(err, what, check);
+        } else {
+            document.getElementById('bookingError').textContent='Error: '+err.message;
+            document.getElementById('bookingError').classList.remove('hidden');
+            showToast('Booking failed: ' + err.message, 'error', 6000);
+        }
     }
 }
 
@@ -1933,43 +2150,41 @@ async function sendLabelEmail() {
     setButtonLoading(btn, true, 'Sending label...');
 
     try {
-        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({
-                action: 'sendEmail', jobNumber: lastBookingData.jobNumber,
-                customerName: lastBookingData.customerName, customerEmail: lastBookingData.customerEmail,
-                pickupDate: lastBookingData.pickupDate, pickupConfirmation: lastUPSResult.pickupConfirmation,
-                trackingNumber: lastUPSResult.trackingNumber
-            })
-        }, 60000);
-        const result = await res.json();
-        if (result.success) {
-            const pickupFailed = lastUPSResult && lastUPSResult.pickupFailed;
-            const jobNum = lastBookingData.jobNumber;
+        // NOT retried — a second attempt emails the customer twice.
+        await postToScript({
+            action: 'sendEmail', jobNumber: lastBookingData.jobNumber,
+            customerName: lastBookingData.customerName, customerEmail: lastBookingData.customerEmail,
+            pickupDate: lastBookingData.pickupDate, pickupConfirmation: lastUPSResult.pickupConfirmation,
+            trackingNumber: lastUPSResult.trackingNumber
+        }, { timeoutMs: 60000 });
 
-            if (pickupFailed) {
-                // Email's gone — now remind the user that pickup still needs rebooking
-                showToast(`Label sent to ${lastBookingData.customerEmail}`, 'success', 3000);
-                await confirmDialog({
-                    title: '⚠ Remember: pickup still needs rebooking',
-                    message: `Label sent to the customer successfully.\n\nThe UPS pickup for ${jobNum} was NOT scheduled — please go to the Rebook Pickup page to arrange collection.`,
-                    okText: 'OK, got it',
-                    cancelText: 'Dismiss'
-                });
-                closeBookingPortal();
-                loadJobs();
-            } else {
-                showToast(`Label sent to ${lastBookingData.customerEmail}`, 'success', 4000);
-                closeBookingPortal();
-                loadJobs();
-            }
+        const pickupFailed = lastUPSResult && lastUPSResult.pickupFailed;
+        const jobNum = lastBookingData.jobNumber;
+
+        if (pickupFailed) {
+            // Email's gone — now remind the user that pickup still needs rebooking
+            showToast(`Label sent to ${lastBookingData.customerEmail}`, 'success', 3000);
+            await confirmDialog({
+                title: '⚠ Remember: pickup still needs rebooking',
+                message: `Label sent to the customer successfully.\n\nThe UPS pickup for ${jobNum} was NOT scheduled — please go to the Rebook Pickup page to arrange collection.`,
+                okText: 'OK, got it',
+                cancelText: 'Dismiss'
+            });
+            closeBookingPortal();
+            loadJobs();
         } else {
-            throw new Error(result.error);
+            showToast(`Label sent to ${lastBookingData.customerEmail}`, 'success', 4000);
+            closeBookingPortal();
+            loadJobs();
         }
     } catch (err) {
-        showToast('Error sending email: ' + err.message, 'error', 6000);
+        console.error('sendLabelEmail failed:', err);
         setButtonLoading(btn, false);
+        await reportAmbiguousFailure(
+            err,
+            `The server stopped responding while sending the label for ${lastBookingData.jobNumber}.`,
+            `The email may or may not have gone out. Check the Sent folder for ${lastBookingData.customerEmail} before sending again.`
+        );
     }
 }
 
@@ -1986,7 +2201,6 @@ function openResendModal() {
     const name = lastBookingData.customerName;
     const pickupDate = lastBookingData.pickupDate;
     const pickupRef = lastUPSResult.pickupConfirmation || '';
-    const pickupFailed = lastUPSResult.pickupFailed;
 
     // When pickup has actually been booked: standard confirmation wording.
     // When pickup failed (labels generated but no collection scheduled yet): softer
@@ -2133,14 +2347,11 @@ async function sendModalEmail() {
         payload.updateSheetEmail = true;
     }
 
+    const jobNumForError = modalContext.jobNumber;
+
     try {
-        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify(payload)
-        }, 60000);
-        const result = await res.json();
-        if (!result.success) throw new Error(result.error || 'Send failed');
+        // NOT retried — a second attempt emails the customer twice.
+        const result = await postToScript(payload, { timeoutMs: 60000 });
 
         // Capture mode before closeEmailModal() clears modalContext
         const mode = modalContext.mode;
@@ -2175,8 +2386,13 @@ async function sendModalEmail() {
             loadJobs();
         }
     } catch (err) {
-        showToast('Error sending email: ' + err.message, 'error', 6000);
+        console.error('sendModalEmail failed:', err);
         setButtonLoading(sendBtn, false);
+        await reportAmbiguousFailure(
+            err,
+            `The server stopped responding while sending the label for ${jobNumForError}.`,
+            `The email may or may not have gone out. Check the Sent folder for ${recipient} before sending again.`
+        );
     }
 }
 
@@ -2229,14 +2445,13 @@ async function lookupJobForRebook() {
     setButtonLoading(btn, true, 'Finding...');
 
     try {
-        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'lookupJob', jobNumber: jn })
-        }, 30000);
-        const result = await res.json();
+        // Retryable — pure read.
+        const result = await postToScript(
+            { action: 'lookupJob', jobNumber: jn },
+            { timeoutMs: 30000 }
+        );
 
-        if (result.success && result.found) {
+        if (result.found) {
             document.getElementById('rbCustomerName').value = result.customerName || '';
             document.getElementById('rbAddress').value = result.customerAddress || '';
             document.getElementById('rbPostcode').value = result.postcode || '';
@@ -2250,6 +2465,7 @@ async function lookupJobForRebook() {
             document.getElementById('rebookError').classList.remove('hidden');
         }
     } catch (err) {
+        console.error('lookupJobForRebook failed:', err);
         document.getElementById('rebookError').textContent = 'Error looking up job: ' + err.message + '. Enter details manually.';
         document.getElementById('rebookError').classList.remove('hidden');
     } finally {
@@ -2274,28 +2490,26 @@ async function submitRebook() {
     setButtonLoading(btn, true, 'Rebooking...');
     const pickupWindow = resolvePickupWindow('rb');
     try {
-        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({
-                action: 'rebookPickup', jobNumber: jn,
-                customerName: name, customerAddress: addr,
-                customerCity: city || addr.split(',').pop().trim(),
-                customerPostcode: pc.toUpperCase(), customerPhone: phone,
-                packCount: rebookPackCount, pickupDateISO: pickup,
-                readyTime: pickupWindow.readyTime, closeTime: pickupWindow.closeTime
-            })
-        }, 60000);
-        const result = await res.json();
-        if (result.success) {
-            showToast(`Collection rebooked. ${jn} — ref ${result.pickupConfirmation}`, 'success', 5000);
-            closeRebookPortal();
-            loadJobs();
-        } else {
-            throw new Error(result.error);
-        }
+        // NOT retried — a duplicate pickup booking confuses the driver.
+        const result = await postToScript({
+            action: 'rebookPickup', jobNumber: jn,
+            customerName: name, customerAddress: addr,
+            customerCity: city || addr.split(',').pop().trim(),
+            customerPostcode: pc.toUpperCase(), customerPhone: phone,
+            packCount: rebookPackCount, pickupDateISO: pickup,
+            readyTime: pickupWindow.readyTime, closeTime: pickupWindow.closeTime
+        }, { timeoutMs: 60000 });
+
+        showToast(`Collection rebooked. ${jn} — ref ${result.pickupConfirmation}`, 'success', 5000);
+        closeRebookPortal();
+        loadJobs();
     } catch (err) {
-        showToast('Error rebooking: ' + err.message, 'error', 6000);
+        console.error('submitRebook failed:', err);
+        await reportAmbiguousFailure(
+            err,
+            `The server stopped responding while rebooking the collection for ${jn}.`,
+            `The pickup may already be booked with UPS. Check before rebooking — a duplicate collection confuses the driver.`
+        );
     } finally {
         setButtonLoading(btn, false);
     }
@@ -2334,14 +2548,13 @@ async function lookupJobForResend() {
     try {
         // Ask the server to look up job details. Uses the same lookupJob action
         // that Rebook uses, so we get customer name / address / email from the sheet.
-        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'lookupJob', jobNumber: jn })
-        }, 30000);
-        const result = await res.json();
+        // Retryable — pure read.
+        const result = await postToScript(
+            { action: 'lookupJob', jobNumber: jn },
+            { timeoutMs: 30000 }
+        );
 
-        if (!result.success || !result.found) {
+        if (!result.found) {
             errEl.textContent = 'Job number not found. Check the spelling and try again.';
             errEl.classList.remove('hidden');
             return;
@@ -2383,6 +2596,7 @@ async function lookupJobForResend() {
         closeResendPortal();
         openArchivedResendModal(job, email, pickupDate);
     } catch (err) {
+        console.error('lookupJobForResend failed:', err);
         errEl.textContent = 'Error looking up job: ' + err.message;
         errEl.classList.remove('hidden');
     } finally {
@@ -2409,23 +2623,14 @@ let collectionsData = [];
 let showDismissed = false;      // whether hidden collections are currently listed
 let dismissedCount = 0;
 let collectionsLoadedAt = 0;    // when the list was last fetched, ms
-const COLLECTIONS_CACHE_KEY = 'collectionsCache';
+// Key bumped when the shape or semantics of the cached list change, so a
+// cache written by an older build is ignored rather than half-understood.
+const COLLECTIONS_CACHE_KEY = 'collectionsCache_v2';
 const COLLECTIONS_FRESH_MS = 15 * 60 * 1000;   // reopen within this window uses the cache
 
-// Apps Script answers a POST with a 302; if the script runs long the redirect lands
-// back on doGet and we get "Repair tracker endpoint is running." instead of JSON.
-// Turn that into a message that says what actually happened.
-async function parseServerJSON(res) {
-    const text = await res.text();
-    try {
-        return JSON.parse(text);
-    } catch (_) {
-        if (text.indexOf('Repair tracker endpoint') >= 0) {
-            throw new Error('the server took too long and gave up. Try "Check UPS Now" again — each attempt checks a few more and saves them.');
-        }
-        throw new Error('unexpected reply from the server: ' + text.substring(0, 80));
-    }
-}
+// NOTE: the old parseServerJSON() helper lived here. Its job is now done by
+// postToScript(), which applies the same non-JSON handling to EVERY call rather
+// than just the three collections functions that used to opt in.
 
 function saveCollectionsCache() {
     try {
@@ -2487,9 +2692,13 @@ function closeCollectionsPortal() {
 
 // Decide the colour band. UPS gives us the scan state; the pickup date turns
 // "no scan yet" into either "fine, not due" or "they didn't come".
+//
+// DELIVERED is deliberately absent. A delivered box is physically on site, so
+// there is nothing left to chase — the server drops those before they reach the
+// client. The only DELIVERED entries that can still turn up here come from a
+// stale sessionStorage cache, and renderCollections() filters those out.
 function classifyCollection(c) {
     if (c.state === 'NOT_CHECKED') return { cls: '', label: '… not checked with UPS yet', rank: 1 };
-    if (c.state === 'DELIVERED') return { cls: 'delivered', label: '📥 Delivered — not booked in yet', rank: 2 };
     if (c.state === 'COLLECTED') return { cls: 'collected', label: '✓ Collected' + (c.collectedAt ? ' — ' + c.collectedAt : ''), rank: 3 };
     if (c.state === 'ERROR')     return { cls: '', label: '⚠ Could not reach UPS' + (c.note ? ' (' + c.note + ')' : ''), rank: 1 };
 
@@ -2514,13 +2723,12 @@ async function loadCollections(force) {
     if (force) setButtonLoading(btn, true, 'Checking…');
 
     try {
-        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'getCollections', force: !!force, includeDismissed: showDismissed })
-        }, 180000);
-        const result = await parseServerJSON(res);
-        if (!result.success) throw new Error(result.error || 'Failed to load collections');
+        // Retryable — getCollections is a read. The server caps live UPS lookups
+        // per request, so a retry just picks up where the first attempt stopped.
+        const result = await postToScript(
+            { action: 'getCollections', force: !!force, includeDismissed: showDismissed },
+            { timeoutMs: 180000 }
+        );
 
         collectionsData = result.collections || [];
         dismissedCount = result.dismissedCount || 0;
@@ -2532,6 +2740,7 @@ async function loadCollections(force) {
             showToast(result.skipped + ' not checked yet — press "Check UPS Now" again to continue', 'info', 5000);
         }
     } catch (err) {
+        console.error('loadCollections failed:', err);
         errEl.textContent = 'Error loading collections: ' + err.message;
         errEl.classList.remove('hidden');
         showToast('Could not load collections: ' + err.message, 'error', 7000);
@@ -2548,16 +2757,21 @@ function renderCollections() {
     listEl.innerHTML = '';
 
     let missed = 0, awaiting = 0, collected = 0;
-    const decorated = collectionsData.map(c => {
-        const k = classifyCollection(c);
-        // Hidden ones don't count towards the totals — they're not being chased
-        if (!c.dismissed) {
-            if (k.cls === 'missed') missed++;
-            else if (k.cls === 'awaiting') awaiting++;
-            else if (k.cls === 'collected' || k.cls === 'delivered') collected++;
-        }
-        return { c, k };
-    });
+    // A delivered box is here. The server already drops these, but a
+    // sessionStorage cache written by an older build can still hold some —
+    // filter them so the list doesn't briefly show packs that have arrived.
+    const decorated = collectionsData
+        .filter(c => c.state !== 'DELIVERED')
+        .map(c => {
+            const k = classifyCollection(c);
+            // Hidden ones don't count towards the totals — they're not being chased
+            if (!c.dismissed) {
+                if (k.cls === 'missed') missed++;
+                else if (k.cls === 'awaiting') awaiting++;
+                else if (k.cls === 'collected') collected++;
+            }
+            return { c, k };
+        });
 
     document.getElementById('csMissed').textContent = missed;
     document.getElementById('csAwaiting').textContent = awaiting;
@@ -2732,20 +2946,16 @@ async function hideCollection(c) {
     saveCollectionsCache();
 
     try {
-        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({
-                action: 'dismissCollection',
-                trackingNumber: c.trackingNumber,
-                jobNumbers: c.jobNumbers,
-                state: c.state
-            })
-        }, 30000);
-        const result = await parseServerJSON(res);
-        if (!result.success) throw new Error(result.error || 'Could not hide it');
+        // Retryable — setting the same dismiss flag twice is a no-op.
+        await postToScript({
+            action: 'dismissCollection',
+            trackingNumber: c.trackingNumber,
+            jobNumbers: c.jobNumbers,
+            state: c.state
+        }, { timeoutMs: 30000 });
         showToast('Hidden — use "Show hidden" at the top to undo', 'success', 4000);
     } catch (err) {
+        console.error('hideCollection failed:', err);
         // Put it back; the server never recorded it
         if (removed) collectionsData.splice(idx, 0, removed);
         dismissedCount = Math.max(0, dismissedCount - 1);
@@ -2763,18 +2973,14 @@ async function restoreCollection(c) {
     saveCollectionsCache();
 
     try {
-        const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({
-                action: 'restoreCollection',
-                trackingNumber: c.trackingNumber
-            })
-        }, 30000);
-        const result = await parseServerJSON(res);
-        if (!result.success) throw new Error(result.error || 'Could not restore it');
+        // Retryable — deleting the same flag twice is a no-op.
+        await postToScript({
+            action: 'restoreCollection',
+            trackingNumber: c.trackingNumber
+        }, { timeoutMs: 30000 });
         showToast('Back on the list', 'success');
     } catch (err) {
+        console.error('restoreCollection failed:', err);
         if (target) target.dismissed = true;
         dismissedCount++;
         renderCollections();
