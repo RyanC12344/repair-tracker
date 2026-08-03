@@ -777,7 +777,7 @@ const API_SECRET = '87e6a7c137dc17b2978c2ff4f5af87cb98ab33be34066de8';
 // but not the tablet" is almost always two devices holding different builds rather
 // than a real backend fault. Open the console on any device and this tells you
 // immediately which frontend that device is actually running.
-const APP_VERSION = '2026-08-03b — postToScript hardening + delivered packs drop off Collections';
+const APP_VERSION = '2026-08-03c — audit: definitive-vs-transport error split, empty-job-number booking guard';
 console.log('%cRepair Tracker frontend build: ' + APP_VERSION, 'font-weight:bold;color:#c41e3a;');
 function showFrontendVersion() { showToast('Frontend build: ' + APP_VERSION, 'info', 8000); return APP_VERSION; }
 
@@ -940,16 +940,34 @@ async function postToScript(payload, opts) {
                 throw new ServerBusyError(describeNonJSON(text), !isReadOnly);
             }
 
+            // The doGet fallthrough now arrives as JSON too (the backend's doGet
+            // returns success:false with this marker). It LOOKS like a server
+            // answer but isn't one — the POST timed out and fell through, so the
+            // real handler may or may not have run. Route it through the same
+            // ambiguity rules as the old plain-text version. The marker string
+            // is load-bearing: it must match what Code.gs's doGet returns.
+            if (data && data.success === false && typeof data.error === 'string' &&
+                data.error.indexOf('fell through to doGet') >= 0) {
+                throw new ServerBusyError('the server took too long and the request fell through to the status page', !isReadOnly);
+            }
+
             // The server ran and said no. That's a real answer, not a transport
-            // failure — never retry it, just surface the reason.
+            // failure — never retry it, never report it as "may have succeeded",
+            // regardless of what words appear in the error text. Tagging it here
+            // is what stops isNetworkError() (a text match, only trustworthy for
+            // errors thrown by fetch itself) from misclassifying a definitive
+            // rejection that happens to mention "network" or "timed out".
             if (data.success === false && !opts.allowFailure) {
-                throw new Error(data.error || 'The server rejected the request.');
+                const rejection = new Error(data.error || 'The server rejected the request.');
+                rejection.definitive = true;
+                throw rejection;
             }
             return data;
 
         } catch (err) {
             lastErr = err;
-            const transport = (err instanceof ServerBusyError) || isNetworkError(err);
+            const transport = !err.definitive &&
+                ((err instanceof ServerBusyError) || isNetworkError(err));
             if (attempt < attempts && transport) {
                 console.warn('postToScript: retrying "' + action + '" in 2s — ' + err.message);
                 await sleep(2000);
@@ -960,7 +978,9 @@ async function postToScript(payload, opts) {
     }
 
     if (lastErr instanceof ServerBusyError) throw lastErr;
-    if (isNetworkError(lastErr)) throw new ServerBusyError(lastErr.message, !isReadOnly);
+    if (lastErr && !lastErr.definitive && isNetworkError(lastErr)) {
+        throw new ServerBusyError(lastErr.message, !isReadOnly);
+    }
     throw lastErr;
 }
 
@@ -977,7 +997,11 @@ async function reportAmbiguousFailure(err, whatHappened, whatToCheck) {
             cancelText: 'Dismiss'
         });
     } else {
-        showToast(whatHappened + ' — ' + err.message, 'error', 7000);
+        // A definitive failure: the server answered and said no. The prose in
+        // whatHappened describes a LOST reply, which this wasn't — showing it
+        // would tell the user to go checking for work that definitively didn't
+        // happen. The server's own message is the accurate report.
+        showToast(err.message, 'error', 7000);
     }
 }
 
@@ -1919,6 +1943,16 @@ function validateBooking() {
 }
 
 async function submitBookingAndUPS() {
+    // If the job list failed to load, nextJobNumber was never generated. Without
+    // this guard the booking posts jobNumber:'' and writeBooking creates rows
+    // with an empty column A — which findJobRow can then never locate again.
+    if (!nextJobNumber) {
+        document.getElementById('bookingError').textContent =
+            'No job number available — the job list did not load, so booking is blocked to protect the sheet. Go Back, reload the page, and try again.';
+        document.getElementById('bookingError').classList.remove('hidden');
+        window.scrollTo(0, 0);
+        return;
+    }
     if(!validateBooking()){document.getElementById('bookingValidation').classList.add('show');return;}
     document.getElementById('bookingValidation').classList.remove('show');
 
