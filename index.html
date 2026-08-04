@@ -777,7 +777,7 @@ const API_SECRET = '87e6a7c137dc17b2978c2ff4f5af87cb98ab33be34066de8';
 // but not the tablet" is almost always two devices holding different builds rather
 // than a real backend fault. Open the console on any device and this tells you
 // immediately which frontend that device is actually running.
-const APP_VERSION = '2026-08-03c — audit: definitive-vs-transport error split, empty-job-number booking guard';
+const APP_VERSION = '2026-08-04a — verify-on-lost-reply for booking and label stages; job number re-derived after any aborted booking';
 console.log('%cRepair Tracker frontend build: ' + APP_VERSION, 'font-weight:bold;color:#c41e3a;');
 function showFrontendVersion() { showToast('Frontend build: ' + APP_VERSION, 'info', 8000); return APP_VERSION; }
 
@@ -843,7 +843,9 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 45000) {
 //
 // Both look identical to the user: a raw JSON error, seemingly at random, which
 // clears when you try again on a different device. That's not a device problem —
-// it's timing.
+// it's timing. The 302 hop is Google's own; nothing in this file or in Code.gs
+// can stop it dropping occasionally. What we CAN do is check afterwards whether
+// the work landed — see verifyBookingLanded() / verifyLabelCreated() below.
 //
 // RETRY IS DELIBERATELY OPT-IN PER ACTION. Blanket retry would be dangerous here:
 // retrying 'generateLabel' creates a second real UPS shipment you get billed for;
@@ -864,6 +866,15 @@ class ServerBusyError extends Error {
         this.name = 'ServerBusyError';
         this.mayHaveSucceeded = !!mayHaveSucceeded;
     }
+}
+
+// Build an error that reportAmbiguousFailure() will treat as a definite "no" —
+// used when we've been back to the sheet and PROVEN the work didn't land, so the
+// user shouldn't be sent off checking for something that isn't there.
+function definiteFailure(message) {
+    const e = new Error(message);
+    e.definitive = true;
+    return e;
 }
 
 // Safe to run twice — no duplicated side effects.
@@ -982,6 +993,121 @@ async function postToScript(payload, opts) {
         throw new ServerBusyError(lastErr.message, !isReadOnly);
     }
     throw lastErr;
+}
+
+// ============ DID THAT ACTUALLY LAND? ============
+// When a write's reply is lost, the sheet still knows the answer. Rather than
+// dead-ending on "not sure whether that went through", go and look.
+//
+// The asymmetry below is deliberate and important:
+//
+//   BOOKING  — the sheet is authoritative in BOTH directions. writeBooking's
+//              first act is to write column A, so if lookupJob can't find the
+//              job, no row was created and it is safe to say so.
+//
+//   LABEL    — the sheet is authoritative in ONE direction only. A tracking
+//              number in column B proves the label exists. An EMPTY column B
+//              proves nothing, because generateUPSLabel catches sheet-write
+//              failures and carries on — so the UPS shipment can exist and be
+//              billable with no tracking number ever reaching the sheet.
+//              We therefore only ever act on the positive signal, and fall back
+//              to the "go and check" dialog otherwise.
+
+// Pull the current month's tab straight from Sheets, bypassing any cached copy.
+// Returns parsed rows, or null if the export didn't give us CSV.
+async function fetchSheetRowsFresh() {
+    try {
+        const gid = getCurrentMonthGid();
+        if (gid === null || gid === undefined) return null;
+        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}&_=${Date.now()}`;
+        const res = await fetch(url, { cache: 'no-store' });
+        const text = (await res.text()).replace(/^\uFEFF/, '');
+        if (/^\s*</.test(text) || text.indexOf('<!DOCTYPE') >= 0) return null;
+        return parseCSV(text);
+    } catch (err) {
+        console.warn('fetchSheetRowsFresh failed:', err);
+        return null;
+    }
+}
+
+// Find the row for a job number. Matches "S0802" against both "S0802" and
+// "S0802 #1"; matches "S0802 #2" only against itself.
+function findSheetRowForJob(rows, jobNumber) {
+    if (!rows) return null;
+    const target = String(jobNumber || '').trim().toUpperCase();
+    if (!target) return null;
+    for (let i = 1; i < rows.length; i++) {
+        const cell = String(rows[i][0] || '').trim().toUpperCase();
+        if (!cell) continue;
+        if (cell === target) return rows[i];
+        if (cell.split('#')[0].trim() === target) return rows[i];
+    }
+    return null;
+}
+
+// How many rows carry this base job number — used to spot a multi-pack booking
+// that only partly wrote before the script died.
+function countSheetRowsForJob(rows, baseJob) {
+    if (!rows) return -1;
+    const target = String(baseJob || '').trim().toUpperCase();
+    if (!target) return -1;
+    let n = 0;
+    for (let i = 1; i < rows.length; i++) {
+        const cell = String(rows[i][0] || '').trim().toUpperCase();
+        if (!cell) continue;
+        if (cell === target || cell.split('#')[0].trim() === target) n++;
+    }
+    return n;
+}
+
+// 'yes' | 'no' | 'partial' | 'unknown'
+async function verifyBookingLanded(jobNumber, expectedRows) {
+    let found = null;
+    try {
+        const r = await postToScript(
+            { action: 'lookupJob', jobNumber: jobNumber },
+            { timeoutMs: 30000, allowFailure: true }
+        );
+        found = !!(r && r.found);
+    } catch (err) {
+        console.warn('verifyBookingLanded: lookupJob failed:', err);
+        return 'unknown';
+    }
+
+    if (!found) return 'no';
+    if (!expectedRows || expectedRows <= 1) return 'yes';
+
+    // Multi-pack: the base job exists, but did every row get written?
+    const rows = await fetchSheetRowsFresh();
+    const n = countSheetRowsForJob(rows, jobNumber);
+    if (n < 0) return 'yes';                 // couldn't count — trust the lookup
+    if (n >= expectedRows) return 'yes';
+    return 'partial';
+}
+
+// { verdict: 'yes'|'unknown', trackingNumber }
+// Never returns 'no' — see the note above about column B not being proof.
+async function verifyLabelCreated(jobRowName) {
+    const rows = await fetchSheetRowsFresh();
+    if (!rows) return { verdict: 'unknown' };
+    const row = findSheetRowForJob(rows, jobRowName);
+    if (!row) return { verdict: 'unknown' };
+    const tracking = String(row[1] || '').trim();
+    if (/^1Z/i.test(tracking)) return { verdict: 'yes', trackingNumber: tracking };
+    return { verdict: 'unknown' };
+}
+
+// After a booking aborts for ANY reason, re-derive the next job number from the
+// sheet. This is what stops the duplicate-row problem: if the booking actually
+// landed, the number moves on; if it didn't, the same number comes back round.
+// Either way the app stops holding a number the sheet has already used.
+async function refreshJobNumberAfterAbort() {
+    const rows = await fetchSheetRowsFresh();
+    if (!rows) return;
+    cachedRows = rows;
+    generateNextJobNumber();
+    const el = document.getElementById('bookingJobNumber');
+    if (el) el.textContent = nextJobNumber || '—';
 }
 
 // For write actions, a lost reply is genuinely ambiguous. Rather than silently
@@ -2013,14 +2139,41 @@ async function submitBookingAndUPS() {
     // about what may or may not already exist on the server.
     let stage = 'booking';
     let labelsMade = 0;
+    let bookingAborted = false;   // any exit through the catch below
 
     try {
-        // Step 1: Save booking to sheet.
-        // NOT retried — a second attempt would add duplicate rows.
+        // ---- Step 1: Save booking to sheet ----
+        // NOT retried — a second attempt would add duplicate rows. But if the
+        // REPLY is lost, the sheet still knows whether the row exists, so go and
+        // ask rather than dead-ending on "not sure".
         setButtonLoading(btn, true, 'Saving booking...');
-        await postToScript(bookingData);
+        try {
+            await postToScript(bookingData);
+        } catch (bookErr) {
+            if (!bookErr.mayHaveSucceeded) throw bookErr;   // server said no — real failure
 
-        // Step 2: Generate UPS label(s) — one per box.
+            setButtonLoading(btn, true, 'Reply lost — checking the sheet...');
+            const verdict = await verifyBookingLanded(nextJobNumber, bookingPackCount);
+
+            if (verdict === 'yes') {
+                console.warn('submitBookingAndUPS: booking reply was lost but the row is present — continuing.');
+                showToast('The reply got lost, but the booking did save — carrying on.', 'info', 5000);
+            } else if (verdict === 'no') {
+                throw definiteFailure(
+                    'The booking did not save — the reply was lost, and there is no row for ' +
+                    nextJobNumber + ' in the sheet. Nothing was written, so it is safe to try again.'
+                );
+            } else if (verdict === 'partial') {
+                throw new ServerBusyError(
+                    bookErr.message + ' — some but not all of the ' + bookingPackCount +
+                    ' pack rows were written', true
+                );
+            } else {
+                throw bookErr;   // couldn't check — fall through to the usual dialog
+            }
+        }
+
+        // ---- Step 2: Generate UPS label(s) — one per box ----
         // NOT retried — every attempt creates a real, billable UPS shipment.
         stage = 'labels';
         setButtonLoading(btn, true, 'Generating UPS label(s)...');
@@ -2048,14 +2201,39 @@ async function submitBookingAndUPS() {
                 weight: boxes[b], packCount: bookingPackCount,
                 boxIndex: b + 1, boxJobs: boxJobs[b]
             };
-            const labelResult = await postToScript(labelData, { timeoutMs: 60000 });
+
+            let labelResult;
+            try {
+                labelResult = await postToScript(labelData, { timeoutMs: 60000 });
+            } catch (labelErr) {
+                if (!labelErr.mayHaveSucceeded) throw labelErr;
+
+                // Only the POSITIVE signal is trusted here. A tracking number in
+                // column B proves the shipment exists and we can carry on with it.
+                // An empty column B proves NOTHING — generateUPSLabel treats a
+                // failed sheet write as non-fatal, so the shipment can exist and
+                // be billable with nothing ever reaching the sheet. In that case
+                // we stop and let the user check, rather than risk double-billing.
+                setButtonLoading(btn, true, 'Reply lost — checking for the label...');
+                const check = await verifyLabelCreated(boxJobs[b][0]);
+                if (check.verdict === 'yes') {
+                    console.warn('submitBookingAndUPS: label reply lost but tracking ' +
+                                 check.trackingNumber + ' is on the sheet — continuing.');
+                    labelResult = { trackingNumber: check.trackingNumber, recovered: true };
+                    showToast('Reply lost, but the label exists — recovered ' + check.trackingNumber, 'info', 6000);
+                } else {
+                    throw labelErr;
+                }
+            }
+
             labelResults.push(labelResult);
             labelsMade++;
         }
 
-        // Step 3: Schedule pickup. If this fails we DON'T throw — labels and sheet row
-        // are already saved with real tracking numbers, so we treat it as a partial
-        // success: email can still go out, and you go to Rebook to schedule collection.
+        // ---- Step 3: Schedule pickup ----
+        // If this fails we DON'T throw — labels and sheet row are already saved
+        // with real tracking numbers, so we treat it as a partial success: email
+        // can still go out, and you go to Rebook to schedule collection.
         stage = 'pickup';
         setButtonLoading(btn, true, 'Scheduling pickup...');
         const pickupWindow = resolvePickupWindow('bk');
@@ -2098,7 +2276,8 @@ async function submitBookingAndUPS() {
             const jobs = boxJobs[i] || [];
             const suffixes = jobs.map(j => j.includes('#') ? '#' + j.split('#')[1].trim() : '').filter(Boolean);
             const label = suffixes.length ? `Box ${i+1} (${suffixes.join(', ')})` : `Box ${i+1}`;
-            return `${label}: <strong>${r.trackingNumber}</strong>`;
+            const recovered = r.recovered ? ' <span style="font-weight:400;font-size:13px;">(recovered from the sheet after a lost reply)</span>' : '';
+            return `${label}: <strong>${r.trackingNumber}</strong>${recovered}`;
         }).join('<br>');
         if (pickupResult) {
             // Full success — same as before
@@ -2148,17 +2327,18 @@ async function submitBookingAndUPS() {
     } catch(err) {
         // Only Step 1 or Step 2 failures reach here (booking save or label gen).
         // Pickup failures are handled above and do NOT throw.
+        bookingAborted = true;
         console.error('submitBookingAndUPS failed at stage "' + stage + '":', err);
         setButtonLoading(btn, false);
         window.scrollTo(0,0);
 
         if (err.mayHaveSucceeded) {
-            // This is the case that matters: the reply was lost, so we genuinely
-            // don't know what landed. Retrying blind could duplicate a sheet row
-            // or create a second billable UPS shipment.
+            // The reply was lost AND the sheet couldn't settle it either way.
+            // Retrying blind could duplicate a sheet row or create a second
+            // billable UPS shipment, so say so plainly and stop.
             const what = stage === 'booking'
-                ? `The booking for ${nextJobNumber} was sent but the server never confirmed.`
-                : `Label ${labelsMade + 1} for ${nextJobNumber} was sent but the server never confirmed. ${labelsMade} label(s) were confirmed before that.`;
+                ? `The booking for ${nextJobNumber} was sent but the server never confirmed, and checking the sheet didn't settle it.`
+                : `Label ${labelsMade + 1} for ${nextJobNumber} was sent but the server never confirmed, and no tracking number has appeared in column B. ${labelsMade} label(s) were confirmed before that.`;
             const check = stage === 'booking'
                 ? `Check the sheet for ${nextJobNumber} before booking again — a blind retry could create duplicate rows.`
                 : `Check the "Repair Tracker Labels" folder in Drive and column B of the sheet before retrying — a blind retry creates a second billable UPS shipment.`;
@@ -2169,6 +2349,15 @@ async function submitBookingAndUPS() {
             document.getElementById('bookingError').textContent='Error: '+err.message;
             document.getElementById('bookingError').classList.remove('hidden');
             showToast('Booking failed: ' + err.message, 'error', 6000);
+        }
+    } finally {
+        // Whatever happened, don't leave the app holding a job number the sheet
+        // may already have used. Re-deriving it from the sheet is what stops a
+        // retry after an aborted booking writing a second row under the same
+        // number — the failure mode that produced the duplicate S0802.
+        if (bookingAborted) {
+            try { await refreshJobNumberAfterAbort(); }
+            catch (e) { console.warn('Could not refresh job number after abort:', e); }
         }
     }
 }
