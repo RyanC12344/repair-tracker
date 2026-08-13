@@ -777,7 +777,12 @@ const API_SECRET = '87e6a7c137dc17b2978c2ff4f5af87cb98ab33be34066de8';
 // but not the tablet" is almost always two devices holding different builds rather
 // than a real backend fault. Open the console on any device and this tells you
 // immediately which frontend that device is actually running.
-const APP_VERSION = '2026-08-04a — verify-on-lost-reply for booking and label stages; job number re-derived after any aborted booking';
+//
+// ⚠ This build REQUIRES Code.gs 2026-08-05-a or later (it uses the nextJobNumber,
+// lookupTracking and lookupRequest actions, and expects writeBooking to return the
+// job number it allocated). On an older backend, booking will fail loudly rather
+// than silently misbehave.
+const APP_VERSION = '2026-08-05a — idempotency keys on every write; server allocates the job number; retry is safe';
 console.log('%cRepair Tracker frontend build: ' + APP_VERSION, 'font-weight:bold;color:#c41e3a;');
 function showFrontendVersion() { showToast('Frontend build: ' + APP_VERSION, 'info', 8000); return APP_VERSION; }
 
@@ -796,6 +801,24 @@ let boxConfig = []; // array of weights for each box
 const totalPages = 5;
 const DATE_CODES_KEY = 'recentDateCodes';
 const BOOKING_STATE_KEY = 'lastBookingState';
+
+// ============ REQUEST IDS ============
+// A request id identifies one LOGICAL operation — one booking, one label, one
+// email. It is generated once and reused on every retry of that operation, which
+// is what lets the server recognise a repeat and replay the original result
+// instead of doing the work twice. Generating a fresh id on retry would defeat
+// the whole mechanism, so ids live in state that survives a failed attempt.
+function newRequestId() {
+    try {
+        if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    } catch (_) {}
+    return 'r-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
+// Held across retries of the same booking. Cleared when the booking completes, or
+// when the portal is opened/closed (i.e. when the user starts a different one).
+let pendingBookingRequest = null;   // { bookingId, labelIds[], pickupId, jobNumber }
+let pendingRebookRequestId = null;  // one rebook attempt, reused until it succeeds
 
 // ============ FETCH HELPER ============
 // Wraps fetch with a timeout so hung requests don't leave the UI stuck forever.
@@ -834,26 +857,16 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 45000) {
 // `await res.json()` is not safe against the two ways this backend fails:
 //
 //   1. Apps Script answers a POST with a 302 to googleusercontent. If the script
-//      runs long, that redirect lands on doGet() and the browser receives
-//      "Repair tracker endpoint is running." — plain text, not JSON. res.json()
-//      then throws "Unexpected token 'R'", which tells you nothing about what
-//      actually went wrong.
+//      runs long, that redirect lands on doGet() and the browser receives the
+//      status page rather than the result.
 //   2. A transient Google hiccup or an expired web-app authorisation returns an
-//      HTML page. res.json() throws "Unexpected token '<'".
+//      HTML page, so res.json() throws "Unexpected token '<'".
 //
-// Both look identical to the user: a raw JSON error, seemingly at random, which
-// clears when you try again on a different device. That's not a device problem —
-// it's timing. The 302 hop is Google's own; nothing in this file or in Code.gs
-// can stop it dropping occasionally. What we CAN do is check afterwards whether
-// the work landed — see verifyBookingLanded() / verifyLabelCreated() below.
-//
-// RETRY IS DELIBERATELY OPT-IN PER ACTION. Blanket retry would be dangerous here:
-// retrying 'generateLabel' creates a second real UPS shipment you get billed for;
-// retrying 'booking' duplicates a sheet row; retrying 'sendEmail' mails the
-// customer twice. Only genuinely repeatable actions are listed below.
-//
-// 'repair' is on the list because writeRepair() sets the same cells to the same
-// values every time, and its column E guard means a second run skips the date.
+// That 302 hop is Google's own and nothing here can stop it dropping occasionally.
+// What HAS changed in this build is that dropping it is no longer expensive:
+// every write carries a requestId, so a retry is a no-op on the server if the
+// first attempt actually landed. Retry is therefore the primary recovery, and
+// the after-the-fact checking below is only the backstop.
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -869,18 +882,21 @@ class ServerBusyError extends Error {
 }
 
 // Build an error that reportAmbiguousFailure() will treat as a definite "no" —
-// used when we've been back to the sheet and PROVEN the work didn't land, so the
-// user shouldn't be sent off checking for something that isn't there.
+// used when we've established the work didn't land, so the user isn't sent off
+// checking for something that isn't there.
 function definiteFailure(message) {
     const e = new Error(message);
     e.definitive = true;
     return e;
 }
 
-// Safe to run twice — no duplicated side effects.
+// Safe to run twice even WITHOUT a request id.
 const RETRYABLE_ACTIONS = [
     'lookupPostcode',
     'lookupJob',
+    'lookupTracking',
+    'lookupRequest',
+    'nextJobNumber',
     'getCollections',
     'dismissCollection',
     'restoreCollection',
@@ -888,8 +904,11 @@ const RETRYABLE_ACTIONS = [
 ];
 
 // Pure reads. A lost reply here changes nothing on the server, so there's no
-// "did it go through?" question to ask the user.
-const READ_ONLY_ACTIONS = ['lookupPostcode', 'lookupJob', 'getCollections'];
+// "did it go through?" question to ask.
+const READ_ONLY_ACTIONS = [
+    'lookupPostcode', 'lookupJob', 'lookupTracking', 'lookupRequest',
+    'nextJobNumber', 'getCollections'
+];
 
 // Turn whatever non-JSON thing came back into a sentence worth reading.
 function describeNonJSON(text) {
@@ -912,19 +931,22 @@ function isNetworkError(err) {
     return /Failed to fetch|NetworkError|timed out|Load failed|network/i.test(m);
 }
 
-// payload  — the object to POST (must include an `action`)
+// payload  — the object to POST (must include an `action`; include `requestId`
+//            for any write you want to be safely retryable)
 // opts     — { timeoutMs, retry (force true/false), allowFailure }
-//            allowFailure: return the parsed body even when success===false,
-//            instead of throwing. Used where the caller wants to inspect it.
 async function postToScript(payload, opts) {
     opts = opts || {};
     const timeoutMs = opts.timeoutMs || 45000;
     const action = (payload && payload.action) || '';
+    const hasRequestId = !!(payload && payload.requestId);
+
+    // A request id makes the action idempotent server-side, so it becomes
+    // retryable regardless of what it does. That is the point of the id.
     const canRetry = (opts.retry !== undefined)
         ? !!opts.retry
-        : RETRYABLE_ACTIONS.indexOf(action) >= 0;
+        : (hasRequestId || RETRYABLE_ACTIONS.indexOf(action) >= 0);
     const isReadOnly = READ_ONLY_ACTIONS.indexOf(action) >= 0;
-    const attempts = canRetry ? 2 : 1;
+    const attempts = canRetry ? (hasRequestId ? 3 : 2) : 1;
 
     let lastErr = null;
 
@@ -941,8 +963,6 @@ async function postToScript(payload, opts) {
             try {
                 data = JSON.parse(text);
             } catch (_) {
-                // Log the real body — next time this happens you'll know exactly
-                // what came back instead of guessing from a parse error.
                 console.warn(
                     'postToScript: non-JSON reply for "' + action + '" ' +
                     '(attempt ' + attempt + ' of ' + attempts + ', HTTP ' + res.status + '):',
@@ -951,12 +971,10 @@ async function postToScript(payload, opts) {
                 throw new ServerBusyError(describeNonJSON(text), !isReadOnly);
             }
 
-            // The doGet fallthrough now arrives as JSON too (the backend's doGet
-            // returns success:false with this marker). It LOOKS like a server
+            // The doGet fallthrough arrives as JSON too. It LOOKS like a server
             // answer but isn't one — the POST timed out and fell through, so the
-            // real handler may or may not have run. Route it through the same
-            // ambiguity rules as the old plain-text version. The marker string
-            // is load-bearing: it must match what Code.gs's doGet returns.
+            // real handler may or may not have run. The marker string is
+            // load-bearing: it must match what Code.gs's doGet returns.
             if (data && data.success === false && typeof data.error === 'string' &&
                 data.error.indexOf('fell through to doGet') >= 0) {
                 throw new ServerBusyError('the server took too long and the request fell through to the status page', !isReadOnly);
@@ -964,14 +982,15 @@ async function postToScript(payload, opts) {
 
             // The server ran and said no. That's a real answer, not a transport
             // failure — never retry it, never report it as "may have succeeded",
-            // regardless of what words appear in the error text. Tagging it here
-            // is what stops isNetworkError() (a text match, only trustworthy for
-            // errors thrown by fetch itself) from misclassifying a definitive
-            // rejection that happens to mention "network" or "timed out".
+            // regardless of what words appear in the error text.
             if (data.success === false && !opts.allowFailure) {
                 const rejection = new Error(data.error || 'The server rejected the request.');
                 rejection.definitive = true;
                 throw rejection;
+            }
+
+            if (data.replayed) {
+                console.info('postToScript: "' + action + '" was already done — server replayed the original result.');
             }
             return data;
 
@@ -995,138 +1014,77 @@ async function postToScript(payload, opts) {
     throw lastErr;
 }
 
-// ============ DID THAT ACTUALLY LAND? ============
-// When a write's reply is lost, the sheet still knows the answer. Rather than
-// dead-ending on "not sure whether that went through", go and look.
-//
-// The asymmetry below is deliberate and important:
-//
-//   BOOKING  — the sheet is authoritative in BOTH directions. writeBooking's
-//              first act is to write column A, so if lookupJob can't find the
-//              job, no row was created and it is safe to say so.
-//
-//   LABEL    — the sheet is authoritative in ONE direction only. A tracking
-//              number in column B proves the label exists. An EMPTY column B
-//              proves nothing, because generateUPSLabel catches sheet-write
-//              failures and carries on — so the UPS shipment can exist and be
-//              billable with no tracking number ever reaching the sheet.
-//              We therefore only ever act on the positive signal, and fall back
-//              to the "go and check" dialog otherwise.
-
-// Pull the current month's tab straight from Sheets, bypassing any cached copy.
-// Returns parsed rows, or null if the export didn't give us CSV.
-async function fetchSheetRowsFresh() {
-    try {
-        const gid = getCurrentMonthGid();
-        if (gid === null || gid === undefined) return null;
-        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}&_=${Date.now()}`;
-        const res = await fetch(url, { cache: 'no-store' });
-        const text = (await res.text()).replace(/^\uFEFF/, '');
-        if (/^\s*</.test(text) || text.indexOf('<!DOCTYPE') >= 0) return null;
-        return parseCSV(text);
-    } catch (err) {
-        console.warn('fetchSheetRowsFresh failed:', err);
-        return null;
-    }
-}
-
-// Find the row for a job number. Matches "S0802" against both "S0802" and
-// "S0802 #1"; matches "S0802 #2" only against itself.
-function findSheetRowForJob(rows, jobNumber) {
-    if (!rows) return null;
-    const target = String(jobNumber || '').trim().toUpperCase();
-    if (!target) return null;
-    for (let i = 1; i < rows.length; i++) {
-        const cell = String(rows[i][0] || '').trim().toUpperCase();
-        if (!cell) continue;
-        if (cell === target) return rows[i];
-        if (cell.split('#')[0].trim() === target) return rows[i];
-    }
-    return null;
-}
-
-// How many rows carry this base job number — used to spot a multi-pack booking
-// that only partly wrote before the script died.
-function countSheetRowsForJob(rows, baseJob) {
-    if (!rows) return -1;
-    const target = String(baseJob || '').trim().toUpperCase();
-    if (!target) return -1;
-    let n = 0;
-    for (let i = 1; i < rows.length; i++) {
-        const cell = String(rows[i][0] || '').trim().toUpperCase();
-        if (!cell) continue;
-        if (cell === target || cell.split('#')[0].trim() === target) n++;
-    }
-    return n;
-}
-
-// 'yes' | 'no' | 'partial' | 'unknown'
-async function verifyBookingLanded(jobNumber, expectedRows) {
-    let found = null;
+// ============ WHAT HAPPENED TO THAT REQUEST? ============
+// Backstop for when all the automatic retries were also lost. The server records
+// each completed write against its request id, and records a job number
+// reservation before writing any booking rows, so it can answer three ways:
+//   { checked:true, found:true,  completed:true  } — it landed; result is real
+//   { checked:true, found:true,  completed:false } — started, didn't finish
+//   { checked:true, found:false }                  — never got far enough to record
+//   { checked:false }                              — we couldn't ask
+async function lookupRequestOutcome(requestId) {
+    if (!requestId) return { checked: false };
     try {
         const r = await postToScript(
-            { action: 'lookupJob', jobNumber: jobNumber },
+            { action: 'lookupRequest', requestId: requestId },
             { timeoutMs: 30000, allowFailure: true }
         );
-        found = !!(r && r.found);
+        if (!r || r.success === false) return { checked: false };
+        return {
+            checked: true,
+            found: !!r.found,
+            completed: !!r.completed,
+            result: r.result || {}
+        };
     } catch (err) {
-        console.warn('verifyBookingLanded: lookupJob failed:', err);
-        return 'unknown';
+        console.warn('lookupRequestOutcome failed for ' + requestId + ':', err);
+        return { checked: false };
     }
-
-    if (!found) return 'no';
-    if (!expectedRows || expectedRows <= 1) return 'yes';
-
-    // Multi-pack: the base job exists, but did every row get written?
-    const rows = await fetchSheetRowsFresh();
-    const n = countSheetRowsForJob(rows, jobNumber);
-    if (n < 0) return 'yes';                 // couldn't count — trust the lookup
-    if (n >= expectedRows) return 'yes';
-    return 'partial';
 }
 
-// { verdict: 'yes'|'unknown', trackingNumber }
-// Never returns 'no' — see the note above about column B not being proof.
+// Does the sheet show a tracking number for this job row?
+//
+// Reads through Apps Script (live sheet), NOT the CSV export. The export is a
+// separate serving path that lags behind writes by tens of seconds, so it can
+// report a tracking number written moments ago as absent — precisely the wrong
+// answer at precisely the wrong moment.
+//
+// Only ever returns 'yes' or 'unknown'. An EMPTY column B proves nothing:
+// generateUPSLabel treats a failed sheet write as non-fatal, so a real billable
+// shipment can exist with nothing ever reaching the sheet.
 async function verifyLabelCreated(jobRowName) {
-    const rows = await fetchSheetRowsFresh();
-    if (!rows) return { verdict: 'unknown' };
-    const row = findSheetRowForJob(rows, jobRowName);
-    if (!row) return { verdict: 'unknown' };
-    const tracking = String(row[1] || '').trim();
-    if (/^1Z/i.test(tracking)) return { verdict: 'yes', trackingNumber: tracking };
+    try {
+        const r = await postToScript(
+            { action: 'lookupTracking', jobNumber: jobRowName },
+            { timeoutMs: 30000, allowFailure: true }
+        );
+        if (r && r.found && /^1Z/i.test(String(r.trackingNumber || '').trim())) {
+            return { verdict: 'yes', trackingNumber: String(r.trackingNumber).trim() };
+        }
+    } catch (err) {
+        console.warn('verifyLabelCreated failed for ' + jobRowName + ':', err);
+    }
     return { verdict: 'unknown' };
 }
 
-// After a booking aborts for ANY reason, re-derive the next job number from the
-// sheet. This is what stops the duplicate-row problem: if the booking actually
-// landed, the number moves on; if it didn't, the same number comes back round.
-// Either way the app stops holding a number the sheet has already used.
-async function refreshJobNumberAfterAbort() {
-    const rows = await fetchSheetRowsFresh();
-    if (!rows) return;
-    cachedRows = rows;
-    generateNextJobNumber();
-    const el = document.getElementById('bookingJobNumber');
-    if (el) el.textContent = nextJobNumber || '—';
-}
-
-// For write actions, a lost reply is genuinely ambiguous. Rather than silently
-// retrying (duplicate label, duplicate email) or silently failing (you assume it
-// didn't work when it did), say so plainly and tell the user what to check.
-async function reportAmbiguousFailure(err, whatHappened, whatToCheck) {
+// For write actions where we genuinely can't tell what landed. `onRetry`, when
+// given, offers a retry — safe because the same request ids are reused, so the
+// server will replay rather than repeat anything that already happened.
+async function reportAmbiguousFailure(err, whatHappened, whatToCheck, onRetry) {
     if (err && err.mayHaveSucceeded) {
-        await confirmDialog({
+        const wantsRetry = await confirmDialog({
             title: '⚠ Not sure whether that went through',
             message: whatHappened + '\n\n' + whatToCheck +
+                     (onRetry ? '\n\nTrying again is safe: the request carries an id the server recognises, so anything that already happened will not happen twice.' : '') +
                      '\n\nDetails: ' + err.message,
-            okText: 'OK, I\'ll check',
-            cancelText: 'Dismiss'
+            okText: onRetry ? 'Try again' : 'OK, I\'ll check',
+            cancelText: onRetry ? 'Leave it' : 'Dismiss'
         });
+        if (wantsRetry && onRetry) await onRetry();
     } else {
         // A definitive failure: the server answered and said no. The prose in
         // whatHappened describes a LOST reply, which this wasn't — showing it
-        // would tell the user to go checking for work that definitively didn't
-        // happen. The server's own message is the accurate report.
+        // would send the user checking for work that definitively didn't happen.
         showToast(err.message, 'error', 7000);
     }
 }
@@ -1166,7 +1124,6 @@ function showToast(message, type = 'info', duration = 3500) {
 }
 
 // Async replacement for window.confirm. Returns Promise<boolean>.
-// Usage: if (await confirmDialog({ title: '...', message: '...', okText: 'Yes', cancelText: 'No' })) { ... }
 function confirmDialog(options) {
     if (typeof options === 'string') options = { message: options };
     const {
@@ -1223,7 +1180,6 @@ function confirmDialog(options) {
 }
 
 // Put a button into a loading/spinner state and restore it after.
-// setButtonLoading(btn, true, 'Saving...'); ... setButtonLoading(btn, false);
 function setButtonLoading(btn, isLoading, loadingText) {
     if (!btn) return;
     if (isLoading) {
@@ -1257,7 +1213,6 @@ function toggleDateEdit() {
 
 function updateSerialDisplay() {
     const el = document.getElementById('serialDigits');
-    // If NO S/N was set, clear that state whenever we update the display from digits
     if (!noSerialNumber) { el.style.color = ''; }
     if (!serialDigitsValue.length) { el.textContent='_____'; el.classList.add('empty'); }
     else { el.textContent = serialDigitsValue + '_'.repeat(5-serialDigitsValue.length); el.classList.remove('empty'); }
@@ -1285,8 +1240,6 @@ function togglePickupTimeWindow(prefix) {
 }
 
 // Resolve the chosen window into UPS-formatted ready/close times.
-// Returns { readyTime: 'HHMM', closeTime: 'HHMM' }. Falls back to all-day if nothing selected.
-// `prefix` is 'bk' or 'rb' to read the right radio group.
 function resolvePickupWindow(prefix) {
     const toggle = document.getElementById(prefix + 'PickupTimeToggle');
     if (!toggle || !toggle.checked) {
@@ -1410,10 +1363,9 @@ function validatePage(n) {
     return true;
 }
 // Silently save the current form state as a draft — no toast, no redirect.
-// Called automatically on every page transition during a repair, so an
-// interrupted session (tablet crash, battery dies) doesn't lose progress.
-// The draft is deleted when the repair is submitted successfully, so this
-// doesn't accumulate stale data — just covers in-progress repairs.
+// Called on every page transition during a repair, so an interrupted session
+// (tablet crash, battery dies) doesn't lose progress. The draft is deleted when
+// the repair is submitted successfully.
 function autoSaveDraft() {
     if (!currentJobData) return;
     try {
@@ -1425,9 +1377,6 @@ function autoSaveDraft() {
             timestamp: new Date().toISOString()
         }));
     } catch (err) {
-        // localStorage can fail if storage is full or disabled; don't break
-        // the flow, just log. Progress since the last successful autosave is
-        // lost in that edge case, but the repair can still be submitted.
         console.warn('Auto-save draft failed:', err);
     }
 }
@@ -1444,7 +1393,7 @@ function parseExpectedDate(s) {
     const now = new Date();
     const year = now.getFullYear();
     const d = new Date(year, parseInt(m[2])-1, parseInt(m[1]));
-    // If the parsed date is more than 2 months in the past, assume it's next year's booking
+    // If the parsed date is more than 2 months in the past, assume next year
     const twoMonthsAgo = new Date(now); twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
     if (d < twoMonthsAgo) d.setFullYear(year + 1);
     return d;
@@ -1473,12 +1422,11 @@ function getDateCategory(d) {
     if (ed.getTime() === t.getTime()) return 'today';
     if (ed.getTime() === tom.getTime()) return 'tomorrow';
 
-    // "This week" means any working day up to and including Friday of the
-    // current working week. Anything Saturday or later is "future" — avoids
-    // labelling a Monday arrival as "this week" when it's actually next week.
+    // "This week" means any working day up to and including Friday of the current
+    // working week. Anything Saturday or later is "future" — avoids labelling a
+    // Monday arrival as "this week" when it's actually next week.
     const endOfWeek = new Date(t);
     const dow = t.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
-    // Days until Friday. If today is Sat (6) or Sun (0), no "this week" remains.
     const daysToFri = dow >= 1 && dow <= 5 ? 5 - dow : -1;
     if (daysToFri < 0) return 'future';
     endOfWeek.setDate(endOfWeek.getDate() + daysToFri);
@@ -1492,6 +1440,10 @@ let cachedRows = [];
 // Fetch a month tab as CSV. Guards against the sheet export returning an HTML
 // page (happens if sharing gets changed to restricted) — without this you get a
 // silent mess of garbage rows rather than a clear error.
+//
+// NOTE: this export lags behind live writes. It's fine for the job LIST, which is
+// what it feeds. It is deliberately NOT used to decide job numbers or to check
+// whether a write landed — those go through Apps Script to the live sheet.
 async function fetchMonthCSV(gid) {
     const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`);
     const text = (await res.text()).replace(/^\uFEFF/, '');
@@ -1510,14 +1462,10 @@ async function loadJobs() {
         const allRows = parseCSV(text); cachedRows = allRows; const rows = allRows.slice(1);
 
         // Also pull last month's tab so bookings from late last month still show up
-        // as "expected" or "current" — a pack booked on 30 April with EXP 02 May would
-        // otherwise vanish from view as soon as the calendar flips to May.
-        // We only keep rows that aren't yet completed (no serial filled in).
+        // as "expected" or "current" — a pack booked on 30 April with EXP 02 May
+        // would otherwise vanish as soon as the calendar flips to May.
         let lastMonthRows = [];
         try {
-            // MONTH_GIDS is keyed 1-12 (Jan=1, May=5). For previous month: subtract 1.
-            // In January (currentMonth=1) there's no previous month in the same year sheet,
-            // so we skip — this is the 2026 sheet only.
             const currentMonth = new Date().getMonth() + 1; // 1-12
             const prevMonth = currentMonth - 1;
             if (prevMonth >= 1 && MONTH_GIDS[prevMonth] !== null && MONTH_GIDS[prevMonth] !== undefined) {
@@ -1534,12 +1482,10 @@ async function loadJobs() {
         document.getElementById('currentMonthDisplay').textContent = `Viewing: ${month} ${new Date().getFullYear()}`;
         const today = new Date(); today.setHours(0,0,0,0);
 
-        // Map current-month rows. Each gets its sheet row index for any later writes.
         const all = rows.map((r,i) => ({jobNumber:r[0]||'',customerName:r[5]||'',customerAddress:r[6]||'',packReceived:r[4]||'',serialNumber:r[13]||'',rowIndex:i+2}));
 
-        // Map last-month's rows but only keep ones still pending: must have packReceived,
-        // must NOT have a serial number (= not yet repaired). Completed jobs from last
-        // month stay where they belong — last month's tab.
+        // Keep only last month's rows that are still pending: must have packReceived,
+        // must NOT have a serial number (= not yet repaired).
         const lastMonthPending = lastMonthRows
             .map(r => ({jobNumber:r[0]||'',customerName:r[5]||'',customerAddress:r[6]||'',packReceived:r[4]||'',serialNumber:r[13]||''}))
             .filter(row => {
@@ -1588,13 +1534,17 @@ async function loadJobs() {
     }
 }
 
+// PROVISIONAL job number, derived from the CSV export purely so the booking
+// header has something to show before the server answers. It is NOT what the
+// booking uses — writeBooking allocates the real number from the live sheet and
+// returns it. Deriving the real number here is what caused the reuse: the export
+// lags, so straight after a booking it hands back the number just used.
 function generateNextJobNumber() {
     const mm = String(new Date().getMonth()+1).padStart(2,'0');
     const prefix = 'S'+mm;
     let maxSeq = 0;
     cachedRows.forEach(row => {
         const job = (row[0]||'').trim().toUpperCase();
-        // Handle multi-pack job numbers like S0432 #1
         const baseJob = job.split('#')[0].trim();
         if (baseJob.startsWith(prefix.toUpperCase())) {
             const seqStr = baseJob.substring(prefix.length);
@@ -1604,6 +1554,23 @@ function generateNextJobNumber() {
     });
     const next = maxSeq + 1;
     nextJobNumber = prefix + (next < 100 ? String(next).padStart(2,'0') : String(next));
+}
+
+// Ask the server for the next number so the header shows something accurate
+// before the booking is submitted. Display only — still not binding.
+async function refreshPreviewJobNumber() {
+    const el = document.getElementById('bookingJobNumber');
+    if (el) el.textContent = nextJobNumber || '…';
+    try {
+        const r = await postToScript({ action: 'nextJobNumber' }, { timeoutMs: 30000 });
+        if (r && r.jobNumber) {
+            nextJobNumber = r.jobNumber;
+            if (el) el.textContent = nextJobNumber;
+        }
+    } catch (err) {
+        console.warn('refreshPreviewJobNumber failed; showing the locally-derived number:', err);
+        if (el) el.textContent = (nextJobNumber || '—');
+    }
 }
 
 // ============ DISPLAY FUNCTIONS ============
@@ -1658,7 +1625,6 @@ function filterJobs() {
     if (df) {
         const filterDate = new Date(df);
         list = list.filter(j => {
-            // Use the already-parsed date stored on the job object (handles both EXP and regular dates)
             const pd = j.receivedDate || j.expectedDate || parseDateFromSheet(j.packReceived);
             return pd && pd.toDateString() === filterDate.toDateString();
         });
@@ -1700,6 +1666,7 @@ function resetForm() {
     dateCodeValue=''; updateDateCodeDisplay(); displayDateCodeSuggestions();
     invoiceValue=''; updateInvoiceDisplay();
     trackingValue=''; updateTrackingDisplay();
+    repairRequestId = null;
     document.getElementById('receivedPack').checked=true;
     document.querySelector('#receivedPack').closest('.checkbox-item').classList.add('checked');
 }
@@ -1729,24 +1696,25 @@ function collectFormData() {
     };
 }
 
-// The old version fired the request and showed "Repair record saved!" from the
-// .then() without ever looking at the response — so a server-side failure still
-// showed a green tick and the draft was deleted. Now the reply is actually
-// checked before anything is claimed.
+// One id per repair submission, reused across retries and cleared on success.
+let repairRequestId = null;
+
 async function submitForm() {
     if (!SERVICE_SCRIPT_URL) { showToast('Apps Script URL not configured.', 'error'); return; }
     const data = collectFormData();
+    if (!repairRequestId) repairRequestId = newRequestId();
+    data.requestId = repairRequestId;
+
     const btn = document.querySelector('#repairForm .btn-submit');
     saveDateCodeSuggestion(dateCodeValue.toUpperCase());
     setButtonLoading(btn, true, 'Saving...');
 
     try {
-        // 'repair' is retryable — writeRepair sets the same cells to the same
-        // values, so a second attempt is harmless.
         await postToScript(data);
         document.getElementById('errorMessage').classList.add('hidden');
         document.getElementById('successMessage').classList.remove('hidden');
         deleteDraft(data.jobNumber);
+        repairRequestId = null;
         window.scrollTo(0, 0);
         showToast('Repair record saved!', 'success');
         setButtonLoading(btn, false);
@@ -1759,8 +1727,8 @@ async function submitForm() {
         // the bench must not lose the work.
         if (err.mayHaveSucceeded) {
             document.getElementById('errorMessage').textContent =
-                'Both attempts to save timed out. The record MAY already be in the sheet — check row for ' +
-                data.jobNumber + ' before re-submitting. Your work is still saved as a draft.';
+                'The save was sent but never confirmed. Press Submit again — it carries an id the server ' +
+                'recognises, so it cannot save twice. Your work is still held as a draft.';
         } else {
             document.getElementById('errorMessage').textContent = 'Error: ' + err.message + ' — your work is still saved as a draft.';
         }
@@ -1770,9 +1738,6 @@ async function submitForm() {
 }
 
 // ============ DRAFTS ============
-// Explicit manual save has been removed — autoSaveDraft() on page transitions
-// and on back-button exit handles everything. Draft is cleared on successful
-// submission so nothing accumulates.
 async function loadDraft(jn) {
     const raw = localStorage.getItem(`draft_${jn}`);
     if (!raw) return false;
@@ -1847,7 +1812,6 @@ function clearBookingState() {
 function openBookingPortal() {
     document.getElementById('jobSelector').classList.add('hidden');
     document.getElementById('bookingPortal').classList.remove('hidden');
-    document.getElementById('bookingJobNumber').textContent = nextJobNumber || '—';
     document.getElementById('bookingCallDate').textContent = formatDateUK(todayISO());
     document.getElementById('bookingSuccess').classList.add('hidden');
     document.getElementById('bookingError').classList.add('hidden');
@@ -1865,7 +1829,7 @@ function openBookingPortal() {
     document.getElementById('boxConfigSection').classList.add('hidden');
     document.getElementById('bookingSubmitBtn').textContent='Book Repair, Generate Label & Schedule Pickup';
     document.getElementById('bookingSubmitBtn').disabled=false;
-    // Reset pickup time window: untick toggle, hide options, default radio back to "All Day"
+    // Reset pickup time window: untick toggle, hide options, default radio to "All Day"
     const bkTimeToggle = document.getElementById('bkPickupTimeToggle');
     bkTimeToggle.checked = false;
     bkTimeToggle.closest('.checkbox-item').classList.remove('checked');
@@ -1873,12 +1837,16 @@ function openBookingPortal() {
     document.querySelectorAll('[data-pf="bkPickupTime"]').forEach(el => {
         el.classList.toggle('checked', el.dataset.val === 'allday');
     });
+    // A new booking is a new logical operation — fresh request ids.
+    pendingBookingRequest = null;
     clearBookingState();
+    refreshPreviewJobNumber();
     window.scrollTo(0,0);
 }
 function closeBookingPortal() {
     document.getElementById('bookingPortal').classList.add('hidden');
     document.getElementById('jobSelector').classList.remove('hidden');
+    pendingBookingRequest = null;
     clearBookingState();
 }
 
@@ -1888,14 +1856,13 @@ function clampPackCount(v) {
     return Math.min(n, 12);
 }
 
-// Rebuild the box list to match the current pack count. Shared by the
-// 1/2/3 buttons and the "4+" number input so they can't drift apart.
+// Rebuild the box list to match the current pack count. Shared by the 1/2/3
+// buttons and the "4+" number input so they can't drift apart.
 function applyPackCount() {
     const boxSection = document.getElementById('boxConfigSection');
     if (bookingPackCount > 1) {
         boxSection.classList.remove('hidden');
-        // Default: each pack in its own box
-        boxConfig = Array(bookingPackCount).fill(10);
+        boxConfig = Array(bookingPackCount).fill(10);   // default: one pack per box
         renderBoxConfig();
     } else {
         boxSection.classList.add('hidden');
@@ -1957,7 +1924,6 @@ function renderBoxConfig() {
         `;
         container.appendChild(div);
     });
-    // Add box button
     const addBtn = document.createElement('button');
     addBtn.textContent = '+ Add Another Box';
     addBtn.style.cssText = 'width:100%;padding:12px;background:#e9ecef;border:2px dashed #adb5bd;border-radius:8px;font-weight:600;cursor:pointer;color:#666;margin-top:4px;';
@@ -2007,8 +1973,6 @@ async function appendEmailSuffix(suffix) {
 }
 
 // ============ POSTCODE LOOKUP (via Apps Script proxy) ============
-// Retryable: a postcode lookup is a pure read, so a lost reply costs nothing
-// and a single automatic retry makes the intermittent failures invisible.
 async function lookupPostcode() {
     const postcode = document.getElementById('bkPostcode').value.trim();
     if (!postcode) { showToast('Please enter a postcode.', 'warning'); return; }
@@ -2069,16 +2033,6 @@ function validateBooking() {
 }
 
 async function submitBookingAndUPS() {
-    // If the job list failed to load, nextJobNumber was never generated. Without
-    // this guard the booking posts jobNumber:'' and writeBooking creates rows
-    // with an empty column A — which findJobRow can then never locate again.
-    if (!nextJobNumber) {
-        document.getElementById('bookingError').textContent =
-            'No job number available — the job list did not load, so booking is blocked to protect the sheet. Go Back, reload the page, and try again.';
-        document.getElementById('bookingError').classList.remove('hidden');
-        window.scrollTo(0, 0);
-        return;
-    }
     if(!validateBooking()){document.getElementById('bookingValidation').classList.add('show');return;}
     document.getElementById('bookingValidation').classList.remove('show');
 
@@ -2096,107 +2050,129 @@ async function submitBookingAndUPS() {
     }
     document.getElementById('bookingError').classList.add('hidden');
 
-    const btn=document.getElementById('bookingSubmitBtn');
+    // Request ids for this booking. Created once; REUSED on every retry, which is
+    // what makes retrying safe — the server replays rather than repeats.
+    if (!pendingBookingRequest) {
+        pendingBookingRequest = {
+            bookingId: newRequestId(),
+            labelIds: [],
+            pickupId: newRequestId(),
+            jobNumber: null
+        };
+    }
+    const req = pendingBookingRequest;
+
+    const btn = document.getElementById('bookingSubmitBtn');
     setButtonLoading(btn, true, 'Saving booking...');
 
-    const pickupISO=document.getElementById('bkPickupDate').value;
-    const pickupDate=new Date(pickupISO);
+    const pickupISO = document.getElementById('bkPickupDate').value;
+    const pickupDate = new Date(pickupISO);
 
-    // Expected arrival is next UPS business day after pickup. UPS doesn't deliver
-    // on Sat/Sun in the UK, so pickups Mon-Thu arrive next day (+1), Friday pickups
-    // arrive Monday (+3), Saturday would arrive Monday too (+2), Sunday pickups
-    // arrive Monday (+1 but really shouldn't happen — UPS doesn't collect Sundays).
-    const expDate=new Date(pickupDate);
-    expDate.setDate(expDate.getDate()+1);
-    // If that landed on a weekend, bump to Monday
+    // Expected arrival is the next UPS business day after pickup. UPS doesn't
+    // deliver Sat/Sun in the UK, so a Friday pickup arrives Monday.
+    const expDate = new Date(pickupDate);
+    expDate.setDate(expDate.getDate() + 1);
     while (expDate.getDay() === 0 || expDate.getDay() === 6) {
         expDate.setDate(expDate.getDate() + 1);
     }
-    const expStr=`EXP ${String(expDate.getDate()).padStart(2,'0')}/${String(expDate.getMonth()+1).padStart(2,'0')}`;
+    const expStr = `EXP ${String(expDate.getDate()).padStart(2,'0')}/${String(expDate.getMonth()+1).padStart(2,'0')}`;
 
     const businessName = document.getElementById('bkBusinessName').value.trim();
     const customerName = document.getElementById('bkCustomerName').value.trim();
     const rawAddress = document.getElementById('bkAddress').value.trim();
     // Business name (if provided) prefixes the address line in the sheet/label —
     // customer name stays pure (just the person's name) in column F.
-    const customerAddress = businessName
-        ? `${businessName}, ${rawAddress}`
-        : rawAddress;
+    const customerAddress = businessName ? `${businessName}, ${rawAddress}` : rawAddress;
     const customerCity = document.getElementById('bkCity').value.trim();
     const customerPostcode = document.getElementById('bkPostcodeFinal').value.trim().toUpperCase();
     const customerPhone = document.getElementById('bkPhone').value.trim();
     const customerEmail = document.getElementById('bkEmail').value.trim();
 
+    // NOTE: no jobNumber is sent. The server allocates it from the live sheet and
+    // returns it. Everything downstream uses the returned number.
     const bookingData = {
-        action:'booking', jobNumber:nextJobNumber, callDate:formatDateUK(todayISO()),
-        packReceived:expStr, customerName, customerAddress, postcode:customerPostcode,
-        phone:customerPhone, email:customerEmail,
-        fault:document.getElementById('bkFault').value.trim(),
-        packCount:bookingPackCount, pickupDate:formatDateUK(pickupISO)
+        action: 'booking', requestId: req.bookingId,
+        callDate: formatDateUK(todayISO()),
+        packReceived: expStr, customerName, customerAddress, postcode: customerPostcode,
+        phone: customerPhone, email: customerEmail,
+        fault: document.getElementById('bkFault').value.trim(),
+        packCount: bookingPackCount, pickupDate: formatDateUK(pickupISO)
     };
 
-    // Tracks how far we got, so an ambiguous failure can say something useful
-    // about what may or may not already exist on the server.
     let stage = 'booking';
     let labelsMade = 0;
-    let bookingAborted = false;   // any exit through the catch below
+    let jobNumber = req.jobNumber || '';
 
     try {
-        // ---- Step 1: Save booking to sheet ----
-        // NOT retried — a second attempt would add duplicate rows. But if the
-        // REPLY is lost, the sheet still knows whether the row exists, so go and
-        // ask rather than dead-ending on "not sure".
+        // ---- Step 1: Save booking to sheet, and get the allocated job number ----
         setButtonLoading(btn, true, 'Saving booking...');
+        let bookingResult = null;
         try {
-            await postToScript(bookingData);
+            bookingResult = await postToScript(bookingData);
         } catch (bookErr) {
             if (!bookErr.mayHaveSucceeded) throw bookErr;   // server said no — real failure
 
-            setButtonLoading(btn, true, 'Reply lost — checking the sheet...');
-            const verdict = await verifyBookingLanded(nextJobNumber, bookingPackCount);
+            // All the automatic retries were lost too. Ask the server what became
+            // of this request id.
+            setButtonLoading(btn, true, 'Reply lost — asking the server...');
+            const outcome = await lookupRequestOutcome(req.bookingId);
 
-            if (verdict === 'yes') {
-                console.warn('submitBookingAndUPS: booking reply was lost but the row is present — continuing.');
+            if (outcome.checked && outcome.found && outcome.completed && outcome.result.jobNumber) {
+                bookingResult = outcome.result;
                 showToast('The reply got lost, but the booking did save — carrying on.', 'info', 5000);
-            } else if (verdict === 'no') {
-                throw definiteFailure(
-                    'The booking did not save — the reply was lost, and there is no row for ' +
-                    nextJobNumber + ' in the sheet. Nothing was written, so it is safe to try again.'
-                );
-            } else if (verdict === 'partial') {
+            } else if (outcome.checked && outcome.found && outcome.result.jobNumber) {
+                // Reserved but never completed: rows may be half-written.
                 throw new ServerBusyError(
-                    bookErr.message + ' — some but not all of the ' + bookingPackCount +
-                    ' pack rows were written', true
+                    bookErr.message + ' — the booking was started as ' + outcome.result.jobNumber +
+                    ' but did not finish, so the sheet may hold a partial row', true
+                );
+            } else if (outcome.checked && !outcome.found) {
+                throw definiteFailure(
+                    'The booking did not save — the server has no record of it, so nothing was written. ' +
+                    'It is safe to try again.'
                 );
             } else {
-                throw bookErr;   // couldn't check — fall through to the usual dialog
+                throw bookErr;   // couldn't ask — fall through to the dialog
             }
         }
 
+        jobNumber = String((bookingResult && bookingResult.jobNumber) || '').trim();
+        if (!jobNumber) {
+            // Almost certainly an old Code.gs that doesn't return the number.
+            throw definiteFailure(
+                'The server saved the booking but did not say which job number it used. ' +
+                'This build needs Code.gs 2026-08-05-a or later — check the Apps Script deployment.'
+            );
+        }
+        req.jobNumber = jobNumber;
+        nextJobNumber = jobNumber;
+        document.getElementById('bookingJobNumber').textContent = jobNumber;
+
         // ---- Step 2: Generate UPS label(s) — one per box ----
-        // NOT retried — every attempt creates a real, billable UPS shipment.
         stage = 'labels';
         setButtonLoading(btn, true, 'Generating UPS label(s)...');
         const boxes = bookingPackCount > 1 ? boxConfig : [bookingPackCount * 10];
 
         // Work out which job rows sit in which box, in order. A 20kg box holds
-        // 2 packs, 30kg holds 3, etc. The server writes each box's tracking
-        // number to every row in its list — without this, all boxes write to
-        // row #1 and overwrite each other.
+        // 2 packs, 30kg holds 3. The server writes each box's tracking number to
+        // every row in its list — without this, all boxes write to row #1.
         let jobCursor = 1;
         const boxJobs = boxes.map(w => {
             const n = Math.max(1, Math.round(w / 10));
             const jobs = [];
             for (let k = 0; k < n; k++) {
-                jobs.push(bookingPackCount > 1 ? `${nextJobNumber} #${jobCursor++}` : nextJobNumber);
+                jobs.push(bookingPackCount > 1 ? `${jobNumber} #${jobCursor++}` : jobNumber);
             }
             return jobs;
         });
 
         const labelResults = [];
         for (let b = 0; b < boxes.length; b++) {
+            if (!req.labelIds[b]) req.labelIds[b] = newRequestId();
+
             const labelData = {
-                action:'generateLabel', jobNumber:nextJobNumber,
+                action: 'generateLabel', requestId: req.labelIds[b],
+                jobNumber: jobNumber,
                 customerName, customerAddress, customerCity, customerPostcode, customerPhone, customerEmail,
                 weight: boxes[b], packCount: bookingPackCount,
                 boxIndex: b + 1, boxJobs: boxJobs[b]
@@ -2208,21 +2184,27 @@ async function submitBookingAndUPS() {
             } catch (labelErr) {
                 if (!labelErr.mayHaveSucceeded) throw labelErr;
 
-                // Only the POSITIVE signal is trusted here. A tracking number in
-                // column B proves the shipment exists and we can carry on with it.
-                // An empty column B proves NOTHING — generateUPSLabel treats a
-                // failed sheet write as non-fatal, so the shipment can exist and
-                // be billable with nothing ever reaching the sheet. In that case
-                // we stop and let the user check, rather than risk double-billing.
                 setButtonLoading(btn, true, 'Reply lost — checking for the label...');
-                const check = await verifyLabelCreated(boxJobs[b][0]);
-                if (check.verdict === 'yes') {
-                    console.warn('submitBookingAndUPS: label reply lost but tracking ' +
-                                 check.trackingNumber + ' is on the sheet — continuing.');
-                    labelResult = { trackingNumber: check.trackingNumber, recovered: true };
-                    showToast('Reply lost, but the label exists — recovered ' + check.trackingNumber, 'info', 6000);
+
+                // First ask the server what happened to this exact request.
+                const outcome = await lookupRequestOutcome(req.labelIds[b]);
+                if (outcome.checked && outcome.completed && outcome.result.trackingNumber) {
+                    labelResult = { trackingNumber: outcome.result.trackingNumber, recovered: true };
+                    showToast('Reply lost, but the label exists — recovered ' + labelResult.trackingNumber, 'info', 6000);
                 } else {
-                    throw labelErr;
+                    // Fall back to the sheet. Only the POSITIVE signal counts: a
+                    // 1Z… in column B proves the shipment exists. An empty column
+                    // B proves nothing, because generateUPSLabel treats a failed
+                    // sheet write as non-fatal — the shipment can exist and be
+                    // billable with nothing reaching the sheet. So we stop and
+                    // let the user check rather than risk double-billing.
+                    const check = await verifyLabelCreated(boxJobs[b][0]);
+                    if (check.verdict === 'yes') {
+                        labelResult = { trackingNumber: check.trackingNumber, recovered: true };
+                        showToast('Reply lost, but the label exists — recovered ' + check.trackingNumber, 'info', 6000);
+                    } else {
+                        throw labelErr;
+                    }
                 }
             }
 
@@ -2231,36 +2213,48 @@ async function submitBookingAndUPS() {
         }
 
         // ---- Step 3: Schedule pickup ----
-        // If this fails we DON'T throw — labels and sheet row are already saved
-        // with real tracking numbers, so we treat it as a partial success: email
-        // can still go out, and you go to Rebook to schedule collection.
+        // If this fails we DON'T throw — labels and sheet rows are already saved
+        // with real tracking numbers, so it's a partial success: the email can
+        // still go out and the collection is booked from the Rebook page.
         stage = 'pickup';
         setButtonLoading(btn, true, 'Scheduling pickup...');
         const pickupWindow = resolvePickupWindow('bk');
         const pickupData = {
-            action:'schedulePickup', jobNumber:nextJobNumber,
+            action: 'schedulePickup', requestId: req.pickupId,
+            jobNumber: jobNumber,
             customerName, customerAddress, customerCity, customerPostcode, customerPhone,
-            packCount:bookingPackCount,
+            packCount: bookingPackCount,
             // UPS counts BOXES, not packs. 7 packs in 3 boxes is a 3-piece collection.
             boxCount: boxes.length,
             totalWeight: boxes.reduce((a, b) => a + b, 0),
-            pickupDate:formatDateUK(pickupISO), pickupDateISO:pickupISO,
+            pickupDate: formatDateUK(pickupISO), pickupDateISO: pickupISO,
             readyTime: pickupWindow.readyTime, closeTime: pickupWindow.closeTime
         };
         let pickupResult = null;
         let pickupError = null;
         try {
-            // NOT retried — a duplicate pickup booking confuses the driver.
             pickupResult = await postToScript(pickupData, { timeoutMs: 60000 });
         } catch (err) {
-            pickupError = err.mayHaveSucceeded
-                ? err.message + ' (the pickup may in fact have been booked — check before rebooking)'
-                : err.message;
+            if (err.mayHaveSucceeded) {
+                // Same trick: ask what happened to the request before giving up.
+                const outcome = await lookupRequestOutcome(req.pickupId);
+                if (outcome.checked && outcome.completed && outcome.result.pickupConfirmation) {
+                    pickupResult = outcome.result;
+                } else {
+                    pickupError = err.message + ' (the pickup may in fact have been booked — check before rebooking)';
+                }
+            } else {
+                pickupError = err.message;
+            }
         }
 
-        // Store results for email sending. When pickup failed, we still store booking+label
-        // info so the Send Label button works — just with no pickup reference.
-        lastBookingData = { ...bookingData, customerCity, customerEmail };
+        // Store results for email sending. When pickup failed we still store the
+        // booking + label info so Send Label works, just with no pickup reference.
+        lastBookingData = {
+            ...bookingData,
+            jobNumber: jobNumber,
+            customerCity, customerEmail
+        };
         lastUPSResult = {
             trackingNumber: labelResults[0].trackingNumber,
             pickupConfirmation: pickupResult ? pickupResult.pickupConfirmation : null,
@@ -2268,21 +2262,24 @@ async function submitBookingAndUPS() {
             allTrackingNumbers: labelResults.map(r => r.trackingNumber),
             pickupFailed: !pickupResult
         };
-        // Persist so a page reload doesn't break the Send Label button
         saveBookingState();
 
-        const packText = bookingPackCount > 1 ? `(${bookingPackCount} packs: ${nextJobNumber} #1 to #${bookingPackCount})` : '';
+        // Booking is done — a further press should start a NEW booking, not replay
+        // this one.
+        pendingBookingRequest = null;
+
+        const packText = bookingPackCount > 1 ? `(${bookingPackCount} packs: ${jobNumber} #1 to #${bookingPackCount})` : '';
         const trackingList = labelResults.map((r, i) => {
             const jobs = boxJobs[i] || [];
             const suffixes = jobs.map(j => j.includes('#') ? '#' + j.split('#')[1].trim() : '').filter(Boolean);
             const label = suffixes.length ? `Box ${i+1} (${suffixes.join(', ')})` : `Box ${i+1}`;
-            const recovered = r.recovered ? ' <span style="font-weight:400;font-size:13px;">(recovered from the sheet after a lost reply)</span>' : '';
+            const recovered = r.recovered ? ' <span style="font-weight:400;font-size:13px;">(recovered after a lost reply)</span>' : '';
             return `${label}: <strong>${r.trackingNumber}</strong>${recovered}`;
         }).join('<br>');
+
         if (pickupResult) {
-            // Full success — same as before
             document.getElementById('upsSuccessMsg').innerHTML = `
-                ✓ Booking saved ${packText}<br>
+                ✓ Booking saved as <strong>${jobNumber}</strong> ${packText}<br>
                 ✓ ${labelResults.length} UPS Label${labelResults.length>1?'s':''} generated:<br>${trackingList}<br>
                 ✓ Pickup scheduled — Ref: <strong>${pickupResult.pickupConfirmation}</strong>
             `;
@@ -2291,20 +2288,17 @@ async function submitBookingAndUPS() {
             setButtonLoading(btn, false);
             btn.textContent = '✓ Complete';
             btn.disabled = true;
-            showToast(`Booking ${nextJobNumber} complete — ${labelResults.length} label(s), pickup ${pickupResult.pickupConfirmation}`, 'success', 5000);
+            showToast(`Booking ${jobNumber} complete — ${labelResults.length} label(s), pickup ${pickupResult.pickupConfirmation}`, 'success', 5000);
             window.scrollTo(0, document.getElementById('upsResults').offsetTop - 100);
         } else {
-            // Partial success — labels saved, pickup failed. Show a prominent warning
-            // but still let the user send the email. They'll need to book the pickup
-            // separately on the Rebook page.
             document.getElementById('upsSuccessMsg').innerHTML = `
                 <div style="background:#fff3cd;border:2px solid #ffc107;color:#856404;padding:14px;border-radius:8px;margin-bottom:12px;font-size:15px;line-height:1.5;">
                     <strong>⚠ Pickup was NOT scheduled</strong><br>
                     Labels were generated successfully, but the pickup request did not complete.<br>
-                    <strong>Go to the Rebook Pickup page and schedule the collection for ${nextJobNumber} separately.</strong><br>
+                    <strong>Go to the Rebook Pickup page and schedule the collection for ${jobNumber} separately.</strong><br>
                     <span style="font-size:13px;opacity:0.85;">Error: ${pickupError}</span>
                 </div>
-                ✓ Booking saved ${packText}<br>
+                ✓ Booking saved as <strong>${jobNumber}</strong> ${packText}<br>
                 ✓ ${labelResults.length} UPS Label${labelResults.length>1?'s':''} generated:<br>${trackingList}<br>
                 ✗ Pickup scheduling FAILED — use Rebook Pickup page
             `;
@@ -2313,11 +2307,10 @@ async function submitBookingAndUPS() {
             setButtonLoading(btn, false);
             btn.textContent = '⚠ Pickup needs rebooking';
             btn.disabled = true;
-            showToast(`Booking ${nextJobNumber} saved — pickup FAILED, go to Rebook Pickup`, 'warning', 10000);
-            // Also show a proper modal dialog so the message isn't missed
+            showToast(`Booking ${jobNumber} saved — pickup FAILED, go to Rebook Pickup`, 'warning', 10000);
             confirmDialog({
                 title: '⚠ Pickup Scheduling Failed',
-                message: `Labels are ready and the booking is saved, but the pickup request did not complete.\n\nSchedule the collection separately using the "Rebook Pickup" page.\n\nJob: ${nextJobNumber}\nError: ${pickupError}`,
+                message: `Labels are ready and the booking is saved, but the pickup request did not complete.\n\nSchedule the collection separately using the "Rebook Pickup" page.\n\nJob: ${jobNumber}\nError: ${pickupError}`,
                 okText: 'OK, I\'ll rebook',
                 cancelText: 'Cancel'
             });
@@ -2325,39 +2318,31 @@ async function submitBookingAndUPS() {
         }
 
     } catch(err) {
-        // Only Step 1 or Step 2 failures reach here (booking save or label gen).
-        // Pickup failures are handled above and do NOT throw.
-        bookingAborted = true;
+        // Only Step 1 or Step 2 failures reach here. Pickup failures don't throw.
         console.error('submitBookingAndUPS failed at stage "' + stage + '":', err);
         setButtonLoading(btn, false);
         window.scrollTo(0,0);
 
+        const jobLabel = jobNumber || 'this booking';
+
         if (err.mayHaveSucceeded) {
-            // The reply was lost AND the sheet couldn't settle it either way.
-            // Retrying blind could duplicate a sheet row or create a second
-            // billable UPS shipment, so say so plainly and stop.
             const what = stage === 'booking'
-                ? `The booking for ${nextJobNumber} was sent but the server never confirmed, and checking the sheet didn't settle it.`
-                : `Label ${labelsMade + 1} for ${nextJobNumber} was sent but the server never confirmed, and no tracking number has appeared in column B. ${labelsMade} label(s) were confirmed before that.`;
+                ? `The booking for ${jobLabel} was sent but never confirmed, and the server couldn't tell us what became of it.`
+                : `Label ${labelsMade + 1} for ${jobLabel} was sent but never confirmed, and no tracking number has appeared. ${labelsMade} label(s) were confirmed before that.`;
             const check = stage === 'booking'
-                ? `Check the sheet for ${nextJobNumber} before booking again — a blind retry could create duplicate rows.`
-                : `Check the "Repair Tracker Labels" folder in Drive and column B of the sheet before retrying — a blind retry creates a second billable UPS shipment.`;
+                ? `Check the sheet for ${jobLabel} before doing anything else.`
+                : `Check the "Repair Tracker Labels" folder in Drive and column B of the sheet before retrying.`;
             document.getElementById('bookingError').textContent = what + ' ' + check;
             document.getElementById('bookingError').classList.remove('hidden');
-            await reportAmbiguousFailure(err, what, check);
+            await reportAmbiguousFailure(err, what, check, () => submitBookingAndUPS());
         } else {
-            document.getElementById('bookingError').textContent='Error: '+err.message;
+            document.getElementById('bookingError').textContent = 'Error: ' + err.message;
             document.getElementById('bookingError').classList.remove('hidden');
             showToast('Booking failed: ' + err.message, 'error', 6000);
-        }
-    } finally {
-        // Whatever happened, don't leave the app holding a job number the sheet
-        // may already have used. Re-deriving it from the sheet is what stops a
-        // retry after an aborted booking writing a second row under the same
-        // number — the failure mode that produced the duplicate S0802.
-        if (bookingAborted) {
-            try { await refreshJobNumberAfterAbort(); }
-            catch (e) { console.warn('Could not refresh job number after abort:', e); }
+            // A definitive failure means nothing landed, so the next attempt should
+            // be a genuinely new booking rather than a replay of this one.
+            pendingBookingRequest = null;
+            refreshPreviewJobNumber();
         }
     }
 }
@@ -2372,10 +2357,16 @@ async function sendLabelEmail() {
     const btn = document.querySelector('.ups-btn-send');
     setButtonLoading(btn, true, 'Sending label...');
 
+    // One id per email, kept on the booking state so a retry reuses it.
+    if (!lastBookingData.emailRequestId) {
+        lastBookingData.emailRequestId = newRequestId();
+        saveBookingState();
+    }
+
     try {
-        // NOT retried — a second attempt emails the customer twice.
         await postToScript({
-            action: 'sendEmail', jobNumber: lastBookingData.jobNumber,
+            action: 'sendEmail', requestId: lastBookingData.emailRequestId,
+            jobNumber: lastBookingData.jobNumber,
             customerName: lastBookingData.customerName, customerEmail: lastBookingData.customerEmail,
             pickupDate: lastBookingData.pickupDate, pickupConfirmation: lastUPSResult.pickupConfirmation,
             trackingNumber: lastUPSResult.trackingNumber
@@ -2385,7 +2376,6 @@ async function sendLabelEmail() {
         const jobNum = lastBookingData.jobNumber;
 
         if (pickupFailed) {
-            // Email's gone — now remind the user that pickup still needs rebooking
             showToast(`Label sent to ${lastBookingData.customerEmail}`, 'success', 3000);
             await confirmDialog({
                 title: '⚠ Remember: pickup still needs rebooking',
@@ -2406,18 +2396,17 @@ async function sendLabelEmail() {
         await reportAmbiguousFailure(
             err,
             `The server stopped responding while sending the label for ${lastBookingData.jobNumber}.`,
-            `The email may or may not have gone out. Check the Sent folder for ${lastBookingData.customerEmail} before sending again.`
+            `The email may or may not have gone out — check the Sent folder for ${lastBookingData.customerEmail}.`,
+            () => sendLabelEmail()
         );
     }
 }
 
 // ============ RESEND / EDIT EMAIL MODAL ============
 // The modal serves two flows:
-//   1. Post-booking "Resend / Edit" — triggered from the booking success screen
-//   2. Archived-label resend — triggered from the job card in the main list
-// We store the current mode + context in modalContext so sendModalEmail knows
-// what to POST when the user hits Send.
-let modalContext = null; // { mode: 'freshResend' | 'archivedResend', jobNumber, customerName, ... }
+//   1. Post-booking "Resend / Edit" — from the booking success screen
+//   2. Archived-label resend — from the standalone Resend Label page
+let modalContext = null;
 
 function openResendModal() {
     if (!lastBookingData || !lastUPSResult) { showToast('No booking data available.', 'error'); return; }
@@ -2425,9 +2414,8 @@ function openResendModal() {
     const pickupDate = lastBookingData.pickupDate;
     const pickupRef = lastUPSResult.pickupConfirmation || '';
 
-    // When pickup has actually been booked: standard confirmation wording.
-    // When pickup failed (labels generated but no collection scheduled yet): softer
-    // wording that doesn't falsely claim a collection has been arranged.
+    // When pickup has actually been booked: standard confirmation wording. When it
+    // failed, softer wording that doesn't falsely claim a collection is arranged.
     const pickupLine = pickupRef
         ? `Further to our telephone conversation today, a collection by UPS has been arranged for between 09.00am and 5pm on ${pickupDate}. Your pickup reference is ${pickupRef}.`
         : `Further to our telephone conversation today, please find the shipping label attached. We will confirm the UPS collection date with you shortly.`;
@@ -2442,29 +2430,27 @@ function openResendModal() {
         jobNumber: lastBookingData.jobNumber,
         customerName: lastBookingData.customerName,
         trackingNumber: lastUPSResult.trackingNumber,
-        originalEmail: lastBookingData.customerEmail || ''
+        originalEmail: lastBookingData.customerEmail || '',
+        requestId: newRequestId()
     };
-    // Reset the update-sheet checkbox; onRecipientChange will show it if user edits
     document.getElementById('modalUpdateSheet').checked = true;
     document.getElementById('modalUpdateSheet').closest('.checkbox-item').classList.add('checked');
     document.getElementById('modalUpdateSheetGroup').classList.add('hidden');
 
-    // Rewire the Send button to our unified handler
     const btn = document.getElementById('modalSendBtn');
     btn.onclick = sendModalEmail;
 
     document.getElementById('emailModal').classList.remove('hidden');
 }
 
-// Called from the Resend button on each job card in the main list.
-// Opens the email modal pre-populated so the user can edit recipient, subject, and body
-// before sending the archived label.
+// Opens the email modal pre-populated so the user can edit recipient, subject and
+// body before sending the archived label.
 function openArchivedResendModal(job, customerEmail, pickupDate) {
     const name = job.customerName || 'Customer';
 
-    // Pick wording based on whether the pickup date is in the past, today/future, or unknown.
-    // A past collection still needs the shipping label (customer might be posting the pack
-    // themselves at a UPS drop-off) but the wording shouldn't imply the pickup is upcoming.
+    // A past collection still needs the shipping label (the customer might be
+    // posting the pack at a UPS drop-off) but the wording shouldn't imply the
+    // pickup is upcoming.
     let pickupLine;
     if (pickupDate) {
         const pickupAsDate = parsePickupDateUK(pickupDate);
@@ -2487,9 +2473,9 @@ function openArchivedResendModal(job, customerEmail, pickupDate) {
         mode: 'archivedResend',
         jobNumber: job.jobNumber,
         customerName: name,
-        originalEmail: customerEmail || ''
+        originalEmail: customerEmail || '',
+        requestId: newRequestId()
     };
-    // Reset and hide the update-sheet checkbox; onRecipientChange will show it if user edits
     document.getElementById('modalUpdateSheet').checked = true;
     document.getElementById('modalUpdateSheet').closest('.checkbox-item').classList.add('checked');
     document.getElementById('modalUpdateSheetGroup').classList.add('hidden');
@@ -2500,8 +2486,7 @@ function openArchivedResendModal(job, customerEmail, pickupDate) {
     document.getElementById('emailModal').classList.remove('hidden');
 }
 
-// Helper: parse a UK-format date string (DD/MM/YYYY) to a Date object.
-// Returns null if the string doesn't match.
+// Helper: parse a UK-format date string (DD/MM/YYYY) to a Date. Null if no match.
 function parsePickupDateUK(s) {
     if (!s || typeof s !== 'string') return null;
     const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -2512,13 +2497,12 @@ function parsePickupDateUK(s) {
 function closeEmailModal() {
     document.getElementById('emailModal').classList.add('hidden');
     modalContext = null;
-    // Make sure the Send button isn't stuck in a spinning state from an interrupted send
     const btn = document.getElementById('modalSendBtn');
     if (btn) setButtonLoading(btn, false);
 }
 
-// Compare typed recipient against the original email on file. Show the
-// "also update the sheet" option only when they differ — otherwise it's noise.
+// Compare typed recipient against the original email on file. Show the "also
+// update the sheet" option only when they differ — otherwise it's noise.
 function onRecipientChange() {
     if (!modalContext) return;
     const typed = document.getElementById('modalRecipient').value.trim().toLowerCase();
@@ -2531,7 +2515,7 @@ function onRecipientChange() {
     }
 }
 
-// Unified send-from-modal handler. Uses modalContext.mode to pick the right action.
+// Unified send-from-modal handler. Uses modalContext.mode to pick the action.
 async function sendModalEmail() {
     if (!modalContext) { showToast('Modal state lost — close and try again.', 'error'); return; }
 
@@ -2539,7 +2523,6 @@ async function sendModalEmail() {
     const subject = document.getElementById('modalSubject').value.trim();
     const body = document.getElementById('modalBody').value.trim();
 
-    // Basic email validation
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
         showToast('Please enter a valid email address.', 'warning');
         return;
@@ -2553,6 +2536,7 @@ async function sendModalEmail() {
     const action = modalContext.mode === 'archivedResend' ? 'resendArchived' : 'resendEmail';
     const payload = {
         action: action,
+        requestId: modalContext.requestId,
         jobNumber: modalContext.jobNumber,
         customerName: modalContext.customerName,
         customerEmail: recipient,
@@ -2561,8 +2545,8 @@ async function sendModalEmail() {
     };
     if (modalContext.trackingNumber) payload.trackingNumber = modalContext.trackingNumber;
 
-    // If the user has changed the recipient from what was on file AND ticked the
-    // "also update the sheet" option, pass a flag so the server updates column J.
+    // If the recipient was changed AND the "also update the sheet" box is ticked,
+    // pass a flag so the server updates column J.
     const recipientChanged = recipient.toLowerCase() !== (modalContext.originalEmail || '').toLowerCase();
     const updateChk = document.getElementById('modalUpdateSheet');
     const shouldUpdateSheet = recipientChanged && updateChk && updateChk.checked;
@@ -2573,7 +2557,6 @@ async function sendModalEmail() {
     const jobNumForError = modalContext.jobNumber;
 
     try {
-        // NOT retried — a second attempt emails the customer twice.
         const result = await postToScript(payload, { timeoutMs: 60000 });
 
         // Capture mode before closeEmailModal() clears modalContext
@@ -2582,9 +2565,8 @@ async function sendModalEmail() {
         const jobNum = modalContext.jobNumber;
         closeEmailModal();
 
-        // Confirm what happened. Check the SERVER's report of whether the sheet
-        // was updated, not just what we asked for — update can fail (row locked,
-        // job not findable, etc.) and we shouldn't silently claim success.
+        // Check the SERVER's report of whether the sheet was updated, not just
+        // what we asked for — the update can fail and we shouldn't claim success.
         const actuallyUpdated = result.sheetEmailUpdated === true;
         if (shouldUpdateSheet && actuallyUpdated) {
             showToast(`Label sent to ${recipient} — sheet email updated for ${jobNum}`, 'success', 5000);
@@ -2594,8 +2576,6 @@ async function sendModalEmail() {
             showToast(`Label sent to ${recipient}`, 'success', 4000);
         }
 
-        // freshResend flow: close the booking portal and refresh the list.
-        // archivedResend flow: nothing else to do — user stays on the main list.
         if (mode === 'freshResend') {
             if (pickupFailed) {
                 await confirmDialog({
@@ -2614,7 +2594,8 @@ async function sendModalEmail() {
         await reportAmbiguousFailure(
             err,
             `The server stopped responding while sending the label for ${jobNumForError}.`,
-            `The email may or may not have gone out. Check the Sent folder for ${recipient} before sending again.`
+            `The email may or may not have gone out — check the Sent folder for ${recipient}.`,
+            () => sendModalEmail()
         );
     }
 }
@@ -2626,6 +2607,7 @@ let rebookReturnToCollections = false;
 
 function openRebookModal() {
     rebookReturnToCollections = false;
+    pendingRebookRequestId = null;
     document.getElementById('jobSelector').classList.add('hidden');
     document.getElementById('rebookPortal').classList.remove('hidden');
     document.getElementById('rebookSuccess').classList.add('hidden');
@@ -2634,7 +2616,6 @@ function openRebookModal() {
     document.getElementById('rbPickupDate').value='';
     rebookPackCount=1;
     document.querySelectorAll('#rebookPortal .pack-count-btn').forEach(b=>b.classList.toggle('selected',b.dataset.rpacks==='1'));
-    // Reset pickup time window: untick toggle, hide options, default radio back to "All Day"
     const rbTimeToggle = document.getElementById('rbPickupTimeToggle');
     rbTimeToggle.checked = false;
     rbTimeToggle.closest('.checkbox-item').classList.remove('checked');
@@ -2646,6 +2627,7 @@ function openRebookModal() {
 }
 function closeRebookPortal() {
     document.getElementById('rebookPortal').classList.add('hidden');
+    pendingRebookRequestId = null;
     if (rebookReturnToCollections) {
         rebookReturnToCollections = false;
         openCollectionsPortal();   // re-reads collections so the new date shows
@@ -2668,7 +2650,6 @@ async function lookupJobForRebook() {
     setButtonLoading(btn, true, 'Finding...');
 
     try {
-        // Retryable — pure read.
         const result = await postToScript(
             { action: 'lookupJob', jobNumber: jn },
             { timeoutMs: 30000 }
@@ -2712,10 +2693,14 @@ async function submitRebook() {
     const btn = document.getElementById('rebookSubmitBtn');
     setButtonLoading(btn, true, 'Rebooking...');
     const pickupWindow = resolvePickupWindow('rb');
+
+    // Reused across retries so a lost reply can't book two collections.
+    if (!pendingRebookRequestId) pendingRebookRequestId = newRequestId();
+
     try {
-        // NOT retried — a duplicate pickup booking confuses the driver.
         const result = await postToScript({
-            action: 'rebookPickup', jobNumber: jn,
+            action: 'rebookPickup', requestId: pendingRebookRequestId,
+            jobNumber: jn,
             customerName: name, customerAddress: addr,
             customerCity: city || addr.split(',').pop().trim(),
             customerPostcode: pc.toUpperCase(), customerPhone: phone,
@@ -2723,6 +2708,7 @@ async function submitRebook() {
             readyTime: pickupWindow.readyTime, closeTime: pickupWindow.closeTime
         }, { timeoutMs: 60000 });
 
+        pendingRebookRequestId = null;
         showToast(`Collection rebooked. ${jn} — ref ${result.pickupConfirmation}`, 'success', 5000);
         closeRebookPortal();
         loadJobs();
@@ -2731,7 +2717,8 @@ async function submitRebook() {
         await reportAmbiguousFailure(
             err,
             `The server stopped responding while rebooking the collection for ${jn}.`,
-            `The pickup may already be booked with UPS. Check before rebooking — a duplicate collection confuses the driver.`
+            `The pickup may already be booked with UPS — check before rebooking, as a duplicate collection confuses the driver.`,
+            () => submitRebook()
         );
     } finally {
         setButtonLoading(btn, false);
@@ -2739,9 +2726,8 @@ async function submitRebook() {
 }
 
 // ============ RESEND LABEL PORTAL ============
-// Standalone "Resend Label" button on the main page. Asks for a job number,
-// looks up the customer email from the sheet, then opens the email edit modal
-// pre-populated with the archived label info. Server sends the label from Drive.
+// Asks for a job number, looks up the customer email from the sheet, then opens
+// the email edit modal. The server sends the label from the Drive archive.
 
 function openResendPortal() {
     document.getElementById('jobSelector').classList.add('hidden');
@@ -2769,9 +2755,6 @@ async function lookupJobForResend() {
     setButtonLoading(btn, true, 'Finding...');
 
     try {
-        // Ask the server to look up job details. Uses the same lookupJob action
-        // that Rebook uses, so we get customer name / address / email from the sheet.
-        // Retryable — pure read.
         const result = await postToScript(
             { action: 'lookupJob', jobNumber: jn },
             { timeoutMs: 30000 }
@@ -2783,39 +2766,26 @@ async function lookupJobForResend() {
             return;
         }
 
-        // Derive a pickup date from the sheet's Pack Received column for the email body.
-        // We don't have the real pickup date stored; if the sheet says "EXP DD/MM", the
-        // pickup was the day before that expected arrival. Otherwise leave it blank
-        // and the email body will use a neutral phrasing.
+        // Derive a pickup date for the email body. lookupJob now returns column E
+        // directly, so we no longer have to hunt through the cached CSV for it.
+        // If E says "EXP DD/MM", the pickup was the working day before.
         let pickupDate = '';
-        // Need to read the original sheet row — re-look it up in cachedRows since
-        // lookupJob's response doesn't include the Pack Received column
-        if (Array.isArray(cachedRows)) {
-            for (const row of cachedRows) {
-                const sheetJob = String(row[0] || '').trim().toUpperCase();
-                const baseJob = sheetJob.split('#')[0].trim();
-                if (sheetJob === jn || baseJob === jn) {
-                    const packRec = String(row[4] || '').trim();
-                    const expMatch = packRec.match(/EXP\s*(\d{1,2})\/(\d{1,2})/i);
-                    if (expMatch) {
-                        const year = new Date().getFullYear();
-                        const shipDay = new Date(year, parseInt(expMatch[2]) - 1, parseInt(expMatch[1]));
-                        shipDay.setDate(shipDay.getDate() - 1);
-                        pickupDate = formatDateUK(shipDay.toISOString().split('T')[0]);
-                    }
-                    break;
-                }
-            }
+        const packRec = String(result.packReceived || '').trim();
+        const expMatch = packRec.match(/EXP\s*(\d{1,2})\/(\d{1,2})/i);
+        if (expMatch) {
+            const year = new Date().getFullYear();
+            const shipDay = new Date(year, parseInt(expMatch[2]) - 1, parseInt(expMatch[1]));
+            shipDay.setDate(shipDay.getDate() - 1);
+            while (shipDay.getDay() === 0 || shipDay.getDay() === 6) shipDay.setDate(shipDay.getDate() - 1);
+            pickupDate = formatDateUK(shipDay.toISOString().split('T')[0]);
         }
 
-        // Build a fake "job" object matching what openArchivedResendModal expects
         const job = {
             jobNumber: jn,
             customerName: result.customerName || 'Customer'
         };
         const email = result.email || '';
 
-        // Close the resend portal and open the email edit modal
         closeResendPortal();
         openArchivedResendModal(job, email, pickupDate);
     } catch (err) {
@@ -2841,19 +2811,14 @@ document.addEventListener('keydown', function(e) {
 //   green  = collected (a real scan exists)
 //   red    = collection date has passed with no scan — UPS didn't turn up
 //   amber  = collection due today or later, nothing yet — normal
-//   blue   = delivered to us but not booked in on the bench
 let collectionsData = [];
 let showDismissed = false;      // whether hidden collections are currently listed
 let dismissedCount = 0;
 let collectionsLoadedAt = 0;    // when the list was last fetched, ms
-// Key bumped when the shape or semantics of the cached list change, so a
-// cache written by an older build is ignored rather than half-understood.
+// Key bumped when the shape or semantics of the cached list change, so a cache
+// written by an older build is ignored rather than half-understood.
 const COLLECTIONS_CACHE_KEY = 'collectionsCache_v2';
 const COLLECTIONS_FRESH_MS = 15 * 60 * 1000;   // reopen within this window uses the cache
-
-// NOTE: the old parseServerJSON() helper lived here. Its job is now done by
-// postToScript(), which applies the same non-JSON handling to EVERY call rather
-// than just the three collections functions that used to opt in.
 
 function saveCollectionsCache() {
     try {
@@ -2887,7 +2852,7 @@ function openCollectionsPortal() {
     window.scrollTo(0, 0);
 
     // Reopening within the freshness window draws straight from the cache — no
-    // waiting, no UPS calls. "Check UPS Now" forces a real refresh whenever wanted.
+    // waiting, no UPS calls. "Check UPS Now" forces a real refresh.
     if (loadCollectionsCache()) {
         document.getElementById('collectionsLoading').classList.add('hidden');
         renderCollections();
@@ -2946,8 +2911,8 @@ async function loadCollections(force) {
     if (force) setButtonLoading(btn, true, 'Checking…');
 
     try {
-        // Retryable — getCollections is a read. The server caps live UPS lookups
-        // per request, so a retry just picks up where the first attempt stopped.
+        // The server caps live UPS lookups per request, so a retry just picks up
+        // where the first attempt stopped.
         const result = await postToScript(
             { action: 'getCollections', force: !!force, includeDismissed: showDismissed },
             { timeoutMs: 180000 }
@@ -2980,9 +2945,8 @@ function renderCollections() {
     listEl.innerHTML = '';
 
     let missed = 0, awaiting = 0, collected = 0;
-    // A delivered box is here. The server already drops these, but a
-    // sessionStorage cache written by an older build can still hold some —
-    // filter them so the list doesn't briefly show packs that have arrived.
+    // A delivered box is here. The server already drops these, but a cache written
+    // by an older build can still hold some — filter them out.
     const decorated = collectionsData
         .filter(c => c.state !== 'DELIVERED')
         .map(c => {
@@ -3074,7 +3038,7 @@ function renderCollections() {
             rs.onclick = () => restoreCollection(c);
             card.appendChild(rs);
         } else if (canRebook) {
-            // Rebook: red = UPS didn't turn up, amber = customer wants a different day.
+            // Rebook: red = UPS didn't turn up, amber = customer wants another day.
             const rb = document.createElement('button');
             rb.className = 'collection-rebook';
             rb.textContent = k.cls === 'missed' ? 'Rebook this collection' : 'Change collection date';
@@ -3092,9 +3056,8 @@ function renderCollections() {
 }
 
 // Swipe-left-to-hide. Uses pointer events so it works with a finger on the bench
-// tablet and with a mouse drag on a desktop.
-// Horizontal vs vertical intent is decided on the first few pixels of movement, so
-// scrolling the list down doesn't drag cards sideways by accident.
+// tablet and with a mouse drag on a desktop. Horizontal vs vertical intent is
+// decided on the first few pixels, so scrolling doesn't drag cards sideways.
 function attachSwipeToHide(card, bg, c) {
     const THRESHOLD = 90;   // px before a swipe counts as "hide it"
     let startX = 0, startY = 0, dx = 0;
@@ -3107,8 +3070,7 @@ function attachSwipeToHide(card, bg, c) {
     };
 
     card.addEventListener('pointerdown', (e) => {
-        // Let buttons be buttons
-        if (e.target.closest('button')) return;
+        if (e.target.closest('button')) return;   // let buttons be buttons
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         active = true; decided = false; horizontal = false; dx = 0;
         startX = e.clientX; startY = e.clientY;
@@ -3169,7 +3131,6 @@ async function hideCollection(c) {
     saveCollectionsCache();
 
     try {
-        // Retryable — setting the same dismiss flag twice is a no-op.
         await postToScript({
             action: 'dismissCollection',
             trackingNumber: c.trackingNumber,
@@ -3196,7 +3157,6 @@ async function restoreCollection(c) {
     saveCollectionsCache();
 
     try {
-        // Retryable — deleting the same flag twice is a no-op.
         await postToScript({
             action: 'restoreCollection',
             trackingNumber: c.trackingNumber
