@@ -320,6 +320,16 @@ textarea { resize: vertical; min-height: 80px; }
                 </div>
             </div>
         </div>
+
+        <!-- Diagnostics. Deliberately plain and out of the way — it exists so the
+             next connection failure can be identified from the tablet, which has
+             no usable browser console. -->
+        <div style="margin-top:22px;text-align:center;">
+            <button onclick="showConnectionDiagnostics()" id="diagnosticsBtn"
+                    style="padding:9px 18px;background:none;border:1px solid #ccc;border-radius:6px;color:#888;font-size:13px;font-weight:600;cursor:pointer;">
+                Connection diagnostics
+            </button>
+        </div>
     </div>
 
     <!-- ===================== BOOKING PORTAL ===================== -->
@@ -782,7 +792,7 @@ const API_SECRET = '87e6a7c137dc17b2978c2ff4f5af87cb98ab33be34066de8';
 // lookupTracking and lookupRequest actions, and expects writeBooking to return the
 // job number it allocated). On an older backend, booking will fail loudly rather
 // than silently misbehave.
-const APP_VERSION = '2026-08-05a — idempotency keys on every write; server allocates the job number; retry is safe';
+const APP_VERSION = '2026-08-05b — captures the ACTUAL failed response (status + body) so we can identify what is really coming back';
 console.log('%cRepair Tracker frontend build: ' + APP_VERSION, 'font-weight:bold;color:#c41e3a;');
 function showFrontendVersion() { showToast('Frontend build: ' + APP_VERSION, 'info', 8000); return APP_VERSION; }
 
@@ -910,6 +920,86 @@ const READ_ONLY_ACTIONS = [
     'nextJobNumber', 'getCollections'
 ];
 
+// ============ FAILURE DETAIL CAPTURE ============
+// Until now, when a request came back as something other than JSON we produced a
+// friendly sentence and threw the actual response away. That left us guessing at
+// WHY: a dropped redirect, a rate-limit page, a sign-in interstitial and a Google
+// error page all look identical once reduced to "the server returned a web page".
+// They have completely different fixes.
+//
+// So: keep the real evidence. HTTP status, final URL, content-type and the first
+// part of the body are recorded here and shown in the failure dialog. The tablets
+// have no usable console, so the detail has to reach the screen or it may as well
+// not exist.
+let lastFailureDetail = null;
+const recentFailures = [];          // newest first, capped
+const MAX_RECORDED_FAILURES = 10;
+
+function recordFailure(detail) {
+    detail.at = new Date().toISOString();
+    lastFailureDetail = detail;
+    recentFailures.unshift(detail);
+    if (recentFailures.length > MAX_RECORDED_FAILURES) recentFailures.length = MAX_RECORDED_FAILURES;
+    console.warn('Connection failure recorded:', detail);
+
+    // Make the button obvious once there's something in it, so nobody has to
+    // remember it exists.
+    const btn = document.getElementById('diagnosticsBtn');
+    if (btn) {
+        btn.textContent = 'Connection diagnostics (' + recentFailures.length + ')';
+        btn.style.borderColor = '#c41e3a';
+        btn.style.color = '#c41e3a';
+    }
+}
+
+// Human-readable version of a recorded failure, for dialogs.
+function formatFailureDetail(d) {
+    if (!d) return '';
+    const when = (() => {
+        try { return new Date(d.at).toLocaleTimeString(); } catch (_) { return d.at; }
+    })();
+    const lines = [];
+    lines.push('Time: ' + when);
+    lines.push('Action: ' + (d.action || '?') + '  (attempt ' + (d.attempt || '?') + ' of ' + (d.attempts || '?') + ')');
+    if (d.kind === 'network') {
+        lines.push('Type: the request never got a response');
+        lines.push('Message: ' + (d.message || ''));
+    } else {
+        lines.push('HTTP: ' + d.status + (d.statusText ? ' ' + d.statusText : ''));
+        if (d.contentType) lines.push('Content-Type: ' + d.contentType);
+        lines.push('Redirected: ' + (d.redirected ? 'yes' : 'no'));
+        if (d.finalUrl) lines.push('Final URL: ' + d.finalUrl);
+        lines.push('Body (' + d.bodyLength + ' chars):');
+        lines.push(d.bodyStart || '(empty)');
+    }
+    return lines.join('\n');
+}
+
+// Reachable from the job list — no console needed. This is the whole point:
+// next time it happens, this screen names the cause instead of us inferring it.
+async function showConnectionDiagnostics() {
+    if (!recentFailures.length) {
+        await confirmDialog({
+            title: 'Connection diagnostics',
+            message: 'No connection failures recorded since this page was loaded.\n\n' +
+                     'Build: ' + APP_VERSION + '\n\n' +
+                     'If a failure happens, come back here and the exact server response ' +
+                     'will be shown — status code, content type and the start of the body. ' +
+                     'Screenshot that and it tells us what is actually going wrong.',
+            okText: 'OK',
+            cancelText: 'Close'
+        });
+        return;
+    }
+    await confirmDialog({
+        title: 'Last connection failure (' + recentFailures.length + ' this session)',
+        message: formatFailureDetail(recentFailures[0]) +
+                 '\n\n— — —\nBuild: ' + APP_VERSION,
+        okText: 'OK',
+        cancelText: 'Close'
+    });
+}
+
 // Turn whatever non-JSON thing came back into a sentence worth reading.
 function describeNonJSON(text) {
     const t = String(text || '').trim();
@@ -921,7 +1011,16 @@ function describeNonJSON(text) {
         if (/sign in|accounts\.google|ServiceLogin|Google Account/i.test(t)) {
             return 'the server returned a Google sign-in page — the web app deployment may need re-authorising';
         }
-        return 'the server returned a web page instead of data (usually a temporary Apps Script hiccup)';
+        if (/rate limit|too many requests|quota|exceeded/i.test(t)) {
+            return 'the server returned a rate-limit or quota page — too many requests in a short time';
+        }
+        if (/temporarily unavailable|try again later|internal error|server error/i.test(t)) {
+            return 'the server returned an error page (Google-side fault, not a timeout)';
+        }
+        if (/permission|authoriz|authoris|access denied|not have access/i.test(t)) {
+            return 'the server returned a permissions page — check who the web app is deployed to run as / who has access';
+        }
+        return 'the server returned a web page instead of data — open Connection diagnostics for the exact response';
     }
     return 'unexpected reply from the server: ' + t.substring(0, 120);
 }
@@ -963,12 +1062,26 @@ async function postToScript(payload, opts) {
             try {
                 data = JSON.parse(text);
             } catch (_) {
-                console.warn(
-                    'postToScript: non-JSON reply for "' + action + '" ' +
-                    '(attempt ' + attempt + ' of ' + attempts + ', HTTP ' + res.status + '):',
-                    text.slice(0, 400)
-                );
-                throw new ServerBusyError(describeNonJSON(text), !isReadOnly);
+                // Keep the evidence. This is the only place the real response is
+                // visible, and on a tablet the console is unreachable — so it gets
+                // recorded and surfaced through Connection diagnostics.
+                const detail = {
+                    kind: 'non-json',
+                    action: action,
+                    attempt: attempt,
+                    attempts: attempts,
+                    status: res.status,
+                    statusText: res.statusText || '',
+                    contentType: (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '',
+                    redirected: !!res.redirected,
+                    finalUrl: res.url || '',
+                    bodyLength: text.length,
+                    bodyStart: text.slice(0, 300)
+                };
+                recordFailure(detail);
+                const busy = new ServerBusyError(describeNonJSON(text), !isReadOnly);
+                busy.detail = detail;
+                throw busy;
             }
 
             // The doGet fallthrough arrives as JSON too. It LOOKS like a server
@@ -977,7 +1090,23 @@ async function postToScript(payload, opts) {
             // load-bearing: it must match what Code.gs's doGet returns.
             if (data && data.success === false && typeof data.error === 'string' &&
                 data.error.indexOf('fell through to doGet') >= 0) {
-                throw new ServerBusyError('the server took too long and the request fell through to the status page', !isReadOnly);
+                const detail = {
+                    kind: 'doget-fallthrough',
+                    action: action,
+                    attempt: attempt,
+                    attempts: attempts,
+                    status: res.status,
+                    statusText: res.statusText || '',
+                    contentType: (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '',
+                    redirected: !!res.redirected,
+                    finalUrl: res.url || '',
+                    bodyLength: text.length,
+                    bodyStart: text.slice(0, 300)
+                };
+                recordFailure(detail);
+                const busy = new ServerBusyError('the server took too long and the request fell through to the status page', !isReadOnly);
+                busy.detail = detail;
+                throw busy;
             }
 
             // The server ran and said no. That's a real answer, not a transport
@@ -996,6 +1125,18 @@ async function postToScript(payload, opts) {
 
         } catch (err) {
             lastErr = err;
+            // A fetch-level failure never produced a response, so there's nothing
+            // to inspect — but record it anyway, because "no response at all" is
+            // itself a distinct and useful answer.
+            if (!err.detail && !err.definitive) {
+                recordFailure({
+                    kind: 'network',
+                    action: action,
+                    attempt: attempt,
+                    attempts: attempts,
+                    message: err.message || String(err)
+                });
+            }
             const transport = !err.definitive &&
                 ((err instanceof ServerBusyError) || isNetworkError(err));
             if (attempt < attempts && transport) {
@@ -1072,11 +1213,16 @@ async function verifyLabelCreated(jobRowName) {
 // server will replay rather than repeat anything that already happened.
 async function reportAmbiguousFailure(err, whatHappened, whatToCheck, onRetry) {
     if (err && err.mayHaveSucceeded) {
+        // Include the raw evidence. Without it we're back to guessing which of
+        // several very different faults this was.
+        const evidence = (err.detail || lastFailureDetail)
+            ? '\n\n— what the server actually sent —\n' + formatFailureDetail(err.detail || lastFailureDetail)
+            : '';
         const wantsRetry = await confirmDialog({
             title: '⚠ Not sure whether that went through',
             message: whatHappened + '\n\n' + whatToCheck +
                      (onRetry ? '\n\nTrying again is safe: the request carries an id the server recognises, so anything that already happened will not happen twice.' : '') +
-                     '\n\nDetails: ' + err.message,
+                     '\n\nDetails: ' + err.message + evidence,
             okText: onRetry ? 'Try again' : 'OK, I\'ll check',
             cancelText: onRetry ? 'Leave it' : 'Dismiss'
         });
@@ -2012,7 +2158,9 @@ async function lookupPostcode() {
         document.getElementById('bkPostcodeFinal').value = (data.addresses[0].postcode || postcode).toUpperCase();
     } catch (err) {
         console.error('lookupPostcode failed:', err);
-        showToast('Address lookup failed — ' + err.message + '. Enter the address manually.', 'error', 6000);
+        showToast('Address lookup failed — ' + err.message +
+                  '. Enter the address manually, then open Connection diagnostics on the job list.',
+                  'error', 9000);
     } finally {
         setButtonLoading(btn, false);
     }
