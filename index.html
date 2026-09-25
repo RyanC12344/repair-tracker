@@ -800,7 +800,11 @@ const API_SECRET = '87e6a7c137dc17b2978c2ff4f5af87cb98ab33be34066de8';
 // lookupTracking and lookupRequest actions, and expects writeBooking to return the
 // job number it allocated). On an older backend, booking will fail loudly rather
 // than silently misbehave.
-const APP_VERSION = '2026-09-25a — dialogs fit tablet screens, resend date fixed for BST, call timing in Connection diagnostics';
+//
+// Carrying on a part-finished booking uses the updateJobDetails action from
+// Code.gs 2026-09-25-a. On an older backend that one step just reports that the
+// sheet couldn't be updated; everything else works as before.
+const APP_VERSION = '2026-09-25b — a booking that fails after saving carries on under the same job number instead of starting again';
 console.log('%cRepair Tracker frontend build: ' + APP_VERSION, 'font-weight:bold;color:#c41e3a;');
 function showFrontendVersion() { showToast('Frontend build: ' + APP_VERSION, 'info', 8000); return APP_VERSION; }
 
@@ -918,7 +922,8 @@ const RETRYABLE_ACTIONS = [
     'getCollections',
     'dismissCollection',
     'restoreCollection',
-    'repair'
+    'repair',
+    'updateJobDetails'   // sets values on existing rows — the same result however many times it runs
 ];
 
 // Pure reads. A lost reply here changes nothing on the server, so there's no
@@ -1027,7 +1032,7 @@ const ACTION_LABELS = {
     lookupTracking: 'Tracking check', lookupRequest: 'Lost-reply check',
     nextJobNumber: 'Next job number', getCollections: 'Collections',
     dismissCollection: 'Hide collection', restoreCollection: 'Restore collection',
-    jobListCSV: 'Job list'
+    updateJobDetails: 'Sheet details update', jobListCSV: 'Job list'
 };
 
 function fmtSecs(ms) { return (ms / 1000).toFixed(1) + 's'; }
@@ -2156,7 +2161,24 @@ function openBookingPortal() {
     refreshPreviewJobNumber();
     window.scrollTo(0,0);
 }
-function closeBookingPortal() {
+// Leaving mid-booking abandons it — the app can't pick an unfinished booking up
+// again later. If it has already saved, say so first, so its rows don't sit on
+// the sheet unnoticed. (Finished bookings clear pendingBookingRequest, so this
+// only ever appears for an unfinished one.)
+async function closeBookingPortal() {
+    const unfinished = pendingBookingRequest && pendingBookingRequest.jobNumber;
+    if (unfinished) {
+        const leave = await confirmDialog({
+            title: `${unfinished} isn't finished`,
+            message: `${unfinished} is saved on the sheet, but its labels and collection aren't all done. ` +
+                     `If you leave now, the app can't carry it on later.\n\n` +
+                     `If this booking isn't going ahead, delete ${unfinished}'s rows from the sheet by hand.`,
+            okText: 'Leave anyway',
+            cancelText: 'Stay',
+            dangerous: true
+        });
+        if (!leave) return;
+    }
     document.getElementById('bookingPortal').classList.add('hidden');
     document.getElementById('jobSelector').classList.remove('hidden');
     pendingBookingRequest = null;
@@ -2365,6 +2387,26 @@ async function submitBookingAndUPS() {
     }
     document.getElementById('bookingError').classList.add('hidden');
 
+    // The packs and boxes this booking is being made with. Once it has been sent,
+    // its rows on the sheet are fixed to that shape, so a retry can't change it —
+    // the labels would no longer line up with the rows.
+    const shapeNow = {
+        packCount: bookingPackCount,
+        boxes: (bookingPackCount > 1 ? boxConfig : [bookingPackCount * 10]).slice()
+    };
+    if (pendingBookingRequest && pendingBookingRequest.shape &&
+        JSON.stringify(pendingBookingRequest.shape) !== JSON.stringify(shapeNow)) {
+        const was = pendingBookingRequest.shape;
+        const jn = pendingBookingRequest.jobNumber || 'This booking';
+        document.getElementById('bookingError').textContent =
+            `${jn} was already sent as ${was.packCount} pack${was.packCount > 1 ? 's' : ''} in ` +
+            `${was.boxes.length} box${was.boxes.length > 1 ? 'es' : ''}, and its rows on the sheet match that. ` +
+            `Set the packs and boxes back as they were to carry on, or go Back to leave this booking.`;
+        document.getElementById('bookingError').classList.remove('hidden');
+        window.scrollTo(0, 0);
+        return;
+    }
+
     // Request ids for this booking. Created once; REUSED on every retry, which is
     // what makes retrying safe — the server replays rather than repeats.
     if (!pendingBookingRequest) {
@@ -2372,7 +2414,9 @@ async function submitBookingAndUPS() {
             bookingId: newRequestId(),
             labelIds: [],
             pickupId: newRequestId(),
-            jobNumber: null
+            jobNumber: null,
+            shape: shapeNow,
+            details: null   // customer details as first sent — see below
         };
     }
     const req = pendingBookingRequest;
@@ -2413,6 +2457,15 @@ async function submitBookingAndUPS() {
         fault: document.getElementById('bkFault').value.trim(),
         packCount: bookingPackCount, pickupDate: formatDateUK(pickupISO)
     };
+
+    // Customer details as they go onto the sheet. Recorded the first time this
+    // booking is sent, so a later retry can tell whether they've been corrected.
+    const detailsNow = {
+        customerName, customerAddress, postcode: customerPostcode,
+        phone: customerPhone, email: customerEmail,
+        fault: bookingData.fault, packReceived: expStr
+    };
+    if (!req.details) req.details = detailsNow;
 
     let stage = 'booking';
     let labelsMade = 0;
@@ -2462,6 +2515,32 @@ async function submitBookingAndUPS() {
         req.jobNumber = jobNumber;
         nextJobNumber = jobNumber;
         document.getElementById('bookingJobNumber').textContent = jobNumber;
+
+        // Carrying on after a failure? The booking step replayed, so the sheet still
+        // holds the details it was FIRST sent with. If they've been corrected since
+        // (usually the address UPS refused), put the corrected ones on the existing
+        // rows before making any more labels. Rebook reads them from the sheet later.
+        if (JSON.stringify(req.details) !== JSON.stringify(detailsNow)) {
+            setButtonLoading(btn, true, 'Updating the sheet...');
+            let updatedRows = 0;
+            try {
+                const u = await postToScript(
+                    Object.assign({ action: 'updateJobDetails', jobNumber: jobNumber }, detailsNow),
+                    { timeoutMs: 30000 }
+                );
+                updatedRows = (u && u.jobDetailsUpdated) || 0;
+            } catch (updErr) {
+                console.warn('updateJobDetails failed for ' + jobNumber + ':', updErr);
+            }
+            if (updatedRows > 0) {
+                req.details = detailsNow;
+                showToast(`Corrected details saved to ${jobNumber} on the sheet`, 'success', 4000);
+            } else {
+                // Don't hold the booking up over this — the labels and collection
+                // matter more. req.details is left alone so the next press tries again.
+                showToast(`Couldn't update ${jobNumber}'s details on the sheet — carrying on, but correct the row by hand`, 'warning', 9000);
+            }
+        }
 
         // ---- Step 2: Generate UPS label(s) — one per box ----
         stage = 'labels';
@@ -2649,15 +2728,29 @@ async function submitBookingAndUPS() {
                 : `Check the "Repair Tracker Labels" folder in Drive and column B of the sheet before retrying.`;
             document.getElementById('bookingError').textContent = what + ' ' + check;
             document.getElementById('bookingError').classList.remove('hidden');
+            if (jobNumber && stage !== 'booking') btn.textContent = `Carry on with ${jobNumber}`;
             await reportAmbiguousFailure(err, what, check, () => submitBookingAndUPS());
-        } else {
+        } else if (stage === 'booking' || !jobNumber) {
             document.getElementById('bookingError').textContent = 'Error: ' + err.message;
             document.getElementById('bookingError').classList.remove('hidden');
             showToast('Booking failed: ' + err.message, 'error', 6000);
-            // A definitive failure means nothing landed, so the next attempt should
-            // be a genuinely new booking rather than a replay of this one.
+            // Refused at the booking step itself, so nothing was saved: the next
+            // attempt should be a genuinely new booking rather than a replay.
             pendingBookingRequest = null;
             refreshPreviewJobNumber();
+        } else {
+            // The booking SAVED and a later step was refused. Starting afresh here is
+            // what used to create a second job number and a second box-1 shipment.
+            // Keep the job number and every request id instead: pressing again
+            // replays what's done and redoes only the step that failed.
+            const totalBoxes = (req.shape && req.shape.boxes.length) || 1;
+            document.getElementById('bookingError').textContent =
+                `Saved as ${jobNumber}, ${labelsMade} of ${totalBoxes} label${totalBoxes > 1 ? 's' : ''} done. ` +
+                `Correct the problem and press "Carry on with ${jobNumber}" — anything already done won't be repeated. ` +
+                `Reason: ${String(err.message || '').replace(/^Error:\s*/, '')}`;
+            document.getElementById('bookingError').classList.remove('hidden');
+            showToast(`${jobNumber} saved but not finished — see the message at the top`, 'error', 8000);
+            btn.textContent = `Carry on with ${jobNumber}`;
         }
     }
 }
