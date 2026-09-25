@@ -206,12 +206,20 @@ textarea { resize: vertical; min-height: 80px; }
 .confirm-box {
     background: white; border-radius: 12px; padding: 28px;
     max-width: 440px; width: 100%;
+    /* Never taller than the screen, so the buttons can't be pushed off the bottom
+       of a tablet. The title and buttons stay put; only the message scrolls.
+       dvh is listed second so browsers that don't know it fall back to vh. */
+    max-height: calc(100vh - 40px);
+    max-height: calc(100dvh - 40px);
+    display: flex; flex-direction: column;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
     animation: confirmIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.confirm-title { font-size: 18px; font-weight: 700; color: #1a2332; margin-bottom: 10px; }
-.confirm-message { color: #495057; font-size: 15px; line-height: 1.5; margin-bottom: 22px; white-space: pre-wrap; }
-.confirm-buttons { display: flex; gap: 10px; justify-content: flex-end; }
+.confirm-title { font-size: 18px; font-weight: 700; color: #1a2332; margin-bottom: 10px; flex-shrink: 0; }
+/* overflow-wrap: long unbroken strings (the googleusercontent URL in failure
+   details) would otherwise push the box wider than the screen. */
+.confirm-message { color: #495057; font-size: 15px; line-height: 1.5; margin-bottom: 22px; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; overflow-y: auto; flex: 1 1 auto; min-height: 0; -webkit-overflow-scrolling: touch; }
+.confirm-buttons { display: flex; gap: 10px; justify-content: flex-end; flex-shrink: 0; }
 .confirm-btn { padding: 11px 22px; border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
 .confirm-btn-cancel { background: #e9ecef; color: #495057; }
 .confirm-btn-cancel:hover { background: #dee2e6; }
@@ -792,7 +800,7 @@ const API_SECRET = '87e6a7c137dc17b2978c2ff4f5af87cb98ab33be34066de8';
 // lookupTracking and lookupRequest actions, and expects writeBooking to return the
 // job number it allocated). On an older backend, booking will fail loudly rather
 // than silently misbehave.
-const APP_VERSION = '2026-08-05b — captures the ACTUAL failed response (status + body) so we can identify what is really coming back';
+const APP_VERSION = '2026-09-25a — dialogs fit tablet screens, resend date fixed for BST, call timing in Connection diagnostics';
 console.log('%cRepair Tracker frontend build: ' + APP_VERSION, 'font-weight:bold;color:#c41e3a;');
 function showFrontendVersion() { showToast('Frontend build: ' + APP_VERSION, 'info', 8000); return APP_VERSION; }
 
@@ -931,32 +939,153 @@ const READ_ONLY_ACTIONS = [
 // part of the body are recorded here and shown in the failure dialog. The tablets
 // have no usable console, so the detail has to reach the screen or it may as well
 // not exist.
-let lastFailureDetail = null;
-const recentFailures = [];          // newest first, capped
-const MAX_RECORDED_FAILURES = 10;
+//
+// Failures are kept on this device for 7 days rather than only until the page
+// reloads, so the count covers a whole working day even if the tablet reloads in
+// between. Each device keeps its own record.
+const DIAG_KEEP_MS = 7 * 24 * 60 * 60 * 1000;
+const FAILURE_LOG_KEY = 'connectionFailures_v1';
+const MAX_RECORDED_FAILURES = 30;
+
+// Read a list saved in this device's storage, dropping anything older than 7 days.
+// Never throws: if storage is unavailable the diagnostics just start empty.
+function loadStoredList(key) {
+    try {
+        const arr = JSON.parse(localStorage.getItem(key) || '[]');
+        if (!Array.isArray(arr)) return [];
+        const cutoff = Date.now() - DIAG_KEEP_MS;
+        return arr.filter(e => e && (e.ts || 0) >= cutoff);
+    } catch (_) { return []; }
+}
+function saveStoredList(key, arr) {
+    try { localStorage.setItem(key, JSON.stringify(arr)); } catch (_) {}
+}
+function isToday(ts) {
+    const d = new Date(ts), n = new Date();
+    return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+}
+
+const recentFailures = loadStoredList(FAILURE_LOG_KEY);   // newest first, capped
+let lastFailureDetail = recentFailures.length ? recentFailures[0] : null;
 
 function recordFailure(detail) {
     detail.at = new Date().toISOString();
+    detail.ts = Date.now();
     lastFailureDetail = detail;
     recentFailures.unshift(detail);
     if (recentFailures.length > MAX_RECORDED_FAILURES) recentFailures.length = MAX_RECORDED_FAILURES;
+    saveStoredList(FAILURE_LOG_KEY, recentFailures);
     console.warn('Connection failure recorded:', detail);
+    refreshDiagnosticsButton();
+}
 
-    // Make the button obvious once there's something in it, so nobody has to
-    // remember it exists.
+// Make the button obvious once there's something in it today, so nobody has to
+// remember it exists. Counts failed ATTEMPTS, including ones an automatic retry
+// then recovered — same as before, just no longer reset by a page reload.
+function refreshDiagnosticsButton() {
     const btn = document.getElementById('diagnosticsBtn');
-    if (btn) {
-        btn.textContent = 'Connection diagnostics (' + recentFailures.length + ')';
+    if (!btn) return;
+    const today = recentFailures.filter(f => isToday(f.ts || 0)).length;
+    if (today) {
+        const shown = today >= MAX_RECORDED_FAILURES ? today + '+' : String(today);
+        btn.textContent = 'Connection diagnostics (' + shown + ' today)';
         btn.style.borderColor = '#c41e3a';
         btn.style.color = '#c41e3a';
+    } else {
+        btn.textContent = 'Connection diagnostics';
+        btn.style.borderColor = '#ccc';
+        btn.style.color = '#888';
     }
+}
+
+// ============ CALL TIMING ============
+// How long each server call takes from this device, including the network and
+// Google's redirect hop — the wait people actually feel. Kept for 7 days so a
+// working day's numbers survive reloads, and so each release can be compared
+// against the days before it.
+//
+// Everything here is wrapped so that timing can never break the call it measures.
+const TIMING_LOG_KEY = 'callTimings_v1';
+const MAX_TIMING_ENTRIES = 1500;
+
+// outcome: 'ok' | 'replayed' (server had already done it) | 'rejected' (server
+// answered and said no) | 'lost' (no usable reply, even after any retries)
+function recordTiming(action, ms, attempts, outcome) {
+    try {
+        const log = loadStoredList(TIMING_LOG_KEY);
+        log.push({ ts: Date.now(), a: action, ms: Math.round(ms), n: attempts || 1, o: outcome });
+        if (log.length > MAX_TIMING_ENTRIES) log.splice(0, log.length - MAX_TIMING_ENTRIES);
+        saveStoredList(TIMING_LOG_KEY, log);
+    } catch (_) {}
+}
+
+const ACTION_LABELS = {
+    booking: 'Booking', generateLabel: 'Label', schedulePickup: 'Pickup',
+    rebookPickup: 'Rebook', sendEmail: 'Label email', resendEmail: 'Resend email',
+    resendArchived: 'Resend from archive', repair: 'Repair save',
+    lookupJob: 'Job lookup', lookupPostcode: 'Postcode lookup',
+    lookupTracking: 'Tracking check', lookupRequest: 'Lost-reply check',
+    nextJobNumber: 'Next job number', getCollections: 'Collections',
+    dismissCollection: 'Hide collection', restoreCollection: 'Restore collection',
+    jobListCSV: 'Job list'
+};
+
+function fmtSecs(ms) { return (ms / 1000).toFixed(1) + 's'; }
+function medianOf(nums) {
+    const s = nums.slice().sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+function summariseTimings(entries) {
+    const by = {};
+    entries.forEach(e => { (by[e.a] = by[e.a] || []).push(e); });
+    return Object.keys(by).map(a => {
+        const list = by[a];
+        const good = list.filter(e => e.o === 'ok' || e.o === 'replayed').map(e => e.ms);
+        return {
+            action: a,
+            label: ACTION_LABELS[a] || a,
+            count: list.length,
+            typical: good.length ? medianOf(good) : null,
+            slowest: good.length ? Math.max.apply(null, good) : null,
+            retried: list.filter(e => (e.n || 1) > 1).length,
+            lost: list.filter(e => e.o === 'lost').length,
+            rejected: list.filter(e => e.o === 'rejected').length
+        };
+    }).sort((x, y) => y.count - x.count);
+}
+
+function timingReport() {
+    const all = loadStoredList(TIMING_LOG_KEY);
+    if (!all.length) return 'No calls timed on this device yet.';
+    const today = all.filter(e => isToday(e.ts));
+    const earlierByAction = {};
+    summariseTimings(all.filter(e => !isToday(e.ts))).forEach(s => { earlierByAction[s.action] = s; });
+
+    const lines = [];
+    lines.push('Timings on this device since ' + new Date(all[0].ts).toLocaleDateString('en-GB') +
+               '. "Typically" is the middle value of the calls that worked.');
+    lines.push('');
+    if (!today.length) lines.push('Nothing timed yet today.');
+    summariseTimings(today).forEach(s => {
+        let line = s.label + ': ' + s.count + ' today';
+        if (s.typical !== null) line += ', typically ' + fmtSecs(s.typical) + ', slowest ' + fmtSecs(s.slowest);
+        if (s.retried) line += ', ' + s.retried + ' needed a retry';
+        if (s.lost) line += ', ' + s.lost + ' lost the reply';
+        if (s.rejected) line += ', ' + s.rejected + ' refused by the server';
+        const prev = earlierByAction[s.action];
+        if (prev && prev.typical !== null) line += '. Previous days typically ' + fmtSecs(prev.typical) + '.';
+        lines.push(line);
+    });
+    return lines.join('\n');
 }
 
 // Human-readable version of a recorded failure, for dialogs.
 function formatFailureDetail(d) {
     if (!d) return '';
     const when = (() => {
-        try { return new Date(d.at).toLocaleTimeString(); } catch (_) { return d.at; }
+        try { return new Date(d.at).toLocaleString('en-GB'); } catch (_) { return d.at; }
     })();
     const lines = [];
     lines.push('Time: ' + when);
@@ -978,23 +1107,28 @@ function formatFailureDetail(d) {
 // Reachable from the job list — no console needed. This is the whole point:
 // next time it happens, this screen names the cause instead of us inferring it.
 async function showConnectionDiagnostics() {
+    const parts = [];
+    parts.push('Build: ' + APP_VERSION);
+    parts.push('');
+    parts.push(timingReport());
+    parts.push('');
     if (!recentFailures.length) {
-        await confirmDialog({
-            title: 'Connection diagnostics',
-            message: 'No connection failures recorded since this page was loaded.\n\n' +
-                     'Build: ' + APP_VERSION + '\n\n' +
-                     'If a failure happens, come back here and the exact server response ' +
-                     'will be shown — status code, content type and the start of the body. ' +
-                     'Screenshot that and it tells us what is actually going wrong.',
-            okText: 'OK',
-            cancelText: 'Close'
-        });
-        return;
+        parts.push('No connection failures recorded on this device in the last 7 days.');
+        parts.push('If one happens, the exact server response will appear here. ' +
+                   'Screenshot it and it tells us what is actually going wrong.');
+    } else {
+        const today = recentFailures.filter(f => isToday(f.ts || 0)).length;
+        const week = recentFailures.length >= MAX_RECORDED_FAILURES
+            ? recentFailures.length + '+' : String(recentFailures.length);
+        parts.push('Failed attempts today: ' + today + ' (last 7 days: ' + week + '). ' +
+                   'This includes attempts an automatic retry then recovered.');
+        parts.push('');
+        parts.push('— most recent failure —');
+        parts.push(formatFailureDetail(recentFailures[0]));
     }
     await confirmDialog({
-        title: 'Last connection failure (' + recentFailures.length + ' this session)',
-        message: formatFailureDetail(recentFailures[0]) +
-                 '\n\n— — —\nBuild: ' + APP_VERSION,
+        title: 'Connection diagnostics',
+        message: parts.join('\n'),
         okText: 'OK',
         cancelText: 'Close'
     });
@@ -1033,7 +1167,7 @@ function isNetworkError(err) {
 // payload  — the object to POST (must include an `action`; include `requestId`
 //            for any write you want to be safely retryable)
 // opts     — { timeoutMs, retry (force true/false), allowFailure }
-async function postToScript(payload, opts) {
+async function postToScriptInner(payload, opts, stats) {
     opts = opts || {};
     const timeoutMs = opts.timeoutMs || 45000;
     const action = (payload && payload.action) || '';
@@ -1050,6 +1184,7 @@ async function postToScript(payload, opts) {
     let lastErr = null;
 
     for (let attempt = 1; attempt <= attempts; attempt++) {
+        if (stats) stats.attempts = attempt;
         try {
             const res = await fetchWithTimeout(SERVICE_SCRIPT_URL, {
                 method: 'POST',
@@ -1153,6 +1288,26 @@ async function postToScript(payload, opts) {
         throw new ServerBusyError(lastErr.message, !isReadOnly);
     }
     throw lastErr;
+}
+
+// Every server call goes through here. It is postToScriptInner() unchanged, with
+// a stopwatch around it — the timing is recorded and the result or error is
+// passed straight back exactly as before.
+async function postToScript(payload, opts) {
+    const action = (payload && payload.action) || '';
+    const stats = { attempts: 0 };
+    const started = Date.now();
+    try {
+        const data = await postToScriptInner(payload, opts, stats);
+        const outcome = (data && data.replayed) ? 'replayed'
+                      : (data && data.success === false) ? 'rejected' : 'ok';
+        recordTiming(action, Date.now() - started, stats.attempts, outcome);
+        return data;
+    } catch (err) {
+        recordTiming(action, Date.now() - started, stats.attempts,
+                     (err && err.definitive) ? 'rejected' : 'lost');
+        throw err;
+    }
 }
 
 // ============ WHAT HAPPENED TO THAT REQUEST? ============
@@ -1342,7 +1497,14 @@ function setButtonLoading(btn, isLoading, loadingText) {
 }
 
 // ============ HELPERS ============
-function todayISO() { return new Date().toISOString().split('T')[0]; }
+// Local calendar date as YYYY-MM-DD. toISOString() gives the UTC date, which
+// during British Summer Time is the day before for anything near local midnight.
+function localISO(d) {
+    d = d || new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
+           String(d.getDate()).padStart(2, '0');
+}
+function todayISO() { return localISO(new Date()); }
 function formatDateUK(iso) {
     if (!iso || typeof iso !== 'string' || !iso.includes('-')) return '';
     const parts = iso.split('-');
@@ -1601,6 +1763,8 @@ async function fetchMonthCSV(gid) {
 }
 
 async function loadJobs() {
+    const listStarted = Date.now();
+    let listTimed = false;
     try {
         const gid = getCurrentMonthGid(), month = getCurrentMonthName();
         if (gid===null) { document.getElementById('loadingJobs').innerHTML=`<div class="error-message">No GID for ${month}.</div>`; return; }
@@ -1623,6 +1787,8 @@ async function loadJobs() {
             // Non-fatal — just means we miss carried-over jobs. Log and continue.
             console.warn('Could not load previous month tab:', prevErr);
         }
+        recordTiming('jobListCSV', Date.now() - listStarted, 1, 'ok');
+        listTimed = true;
 
         document.getElementById('loadingJobs').classList.add('hidden');
         document.getElementById('currentMonthDisplay').textContent = `Viewing: ${month} ${new Date().getFullYear()}`;
@@ -1675,6 +1841,7 @@ async function loadJobs() {
         updateCategoryCounts();
     } catch(err) {
         console.error(err);
+        if (!listTimed) recordTiming('jobListCSV', Date.now() - listStarted, 1, 'lost');
         document.getElementById('loadingJobs').classList.remove('hidden');
         document.getElementById('loadingJobs').innerHTML='<div class="error-message">Error loading jobs: ' + err.message + '</div>';
     }
@@ -2925,7 +3092,7 @@ async function lookupJobForResend() {
             const shipDay = new Date(year, parseInt(expMatch[2]) - 1, parseInt(expMatch[1]));
             shipDay.setDate(shipDay.getDate() - 1);
             while (shipDay.getDay() === 0 || shipDay.getDay() === 6) shipDay.setDate(shipDay.getDate() - 1);
-            pickupDate = formatDateUK(shipDay.toISOString().split('T')[0]);
+            pickupDate = formatDateUK(localISO(shipDay));
         }
 
         const job = {
@@ -3332,6 +3499,7 @@ function rebookFromCollection(c) {
 }
 
 // ============ INIT ============
+refreshDiagnosticsButton();
 loadBookingState();
 loadJobs();
 updateProgress();
